@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Git Sentinel
+Comment=Daily git repository audit - checks for uncommitted or unpushed work
+Exec={exec}
+Icon=git-sentinel
+{extra}
+StartupNotify=false
+Terminal=false
