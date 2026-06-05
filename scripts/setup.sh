@@ -29,7 +29,7 @@ if ! command -v pre-commit &>/dev/null; then
   exit 1 # early fail - no pre-commit hook
 fi
 
-echo "Installing pre-commit hooks…"
+echo "Installing pre-commit hooks..."
 (cd "$SCRIPT_DIR" && pre-commit install)
 (cd "$SCRIPT_DIR" && pre-commit install --hook-type commit-msg)
 
