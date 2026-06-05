@@ -1,0 +1,72 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+  "name": "Python 3",
+  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "image": "mcr.microsoft.com/devcontainers/python:3-trixie",
+  //
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  // "features": {},
+  //
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+  //
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": ".devcontainer/post_create.sh",
+  //
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "streetsidesoftware.code-spell-checker-british-english",
+        "GitLab.gitlab-workflow",
+        "eamodio.gitlens",
+        "SonarSource.sonarlint-vscode",
+        "MASSHUU12.too-long-line-limit",
+        "rodolphebarbanneau.python-docstring-highlighter",
+        "ms-python.black-formatter",
+        "njpwerner.autodocstring",
+        "ms-python.mypy-type-checker",
+        "bigonesystems.django",
+        "Gruntfuggly.todo-tree",
+        "EditorConfig.EditorConfig",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "files.exclude": {
+          "**/__pycache__": true
+        },
+        "files.insertFinalNewline": true,
+        "editor.formatOnPaste": true,
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        "emmet.includeLanguages": {
+          "django-html": "html"
+        },
+        // temp
+        "python.useEnvironmentsExtension": true
+      }
+    }
+  },
+  // Permit providing extra envvars to devcontainer
+  "runArgs": [
+    "--env-file",
+    ".devcontainer/.env"
+  ],
+  "remoteEnv": {
+    "CLAUDE_CONFIG_DIR": "${containerWorkspaceFolder}/.claude-sessions"
+  }
+  //
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root"
+}
