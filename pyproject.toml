@@ -17,4 +17,15 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [dependency-groups]
-dev = ["black>=26.3.0", "pytest-cov", "pre-commit>=4.5.1", "pyinstaller>=6.0"]
+dev = [
+  "black>=26.3.0",
+  "mypy>=2.1.0",
+  "pytest-cov",
+  "pre-commit>=4.5.1",
+  "pyinstaller>=6.0",
+]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_configs = true

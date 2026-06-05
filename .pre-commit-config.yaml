@@ -11,6 +11,13 @@ repos:
     hooks:
       - id: black
 
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        files: ^(src/|git-sentinel\.py)
+        args: [--strict]
+
   - repo: https://github.com/opensource-nepal/commitlint
     rev: v1.13.3
     hooks:
