@@ -1,0 +1,134 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# git-sentinel CI/CD pipeline
+#
+# Stages:
+#   build   - compile the PyInstaller binary
+#   publish - upload the binary to the Generic Package Registry
+#   release - create a GitLab Release (tagged builds only)
+#
+# Triggers:
+#   commit / MR                → build only
+#   versioned tag              → build → publish → release
+#   scheduled pipeline (main)  → build → publish (nightly, rolling)
+#
+# Tag conventions:
+#   v1.2.3             stable release
+#   v1.2.3-alpha.1     alpha pre-release
+#   v1.2.3-beta.1      beta pre-release
+#
+# Nightly setup:
+#   Go to CI/CD → Schedules in GitLab and create a schedule targeting
+#   the main branch (e.g. daily at 03:00 UTC).  Each run overwrites the
+#   single "nightly" package entry so the download URL stays stable.
+#
+# Nightly download URL (once a schedule has run):
+#   $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/git-sentinel/nightly
+#   /git-sentinel
+# ──────────────────────────────────────────────────────────────────────────────
+
+stages:
+  - build
+  - publish
+  - release
+
+variables:
+  BINARY:  git-sentinel
+  PACKAGE: git-sentinel
+
+# ───────────────────────────────────────────────────| Shared build template |──
+
+.build:
+  stage: build
+  image: python:3.14
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq tk
+    - pip install uv --quiet
+  script:
+    - bash scripts/build.sh
+  artifacts:
+    paths:
+      - dist/git-sentinel
+    expire_in: 1 week
+
+# ──────────────────────────────────────────────────────────────| Build jobs |──
+
+# Runs on every commit, MR, and tag - but not on scheduled pipelines (those use
+# build:nightly instead to keep artifact naming separate).
+build:
+  extends: .build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Runs only on scheduled pipelines; artifact expires quickly since it is
+# immediately re-uploaded to the package registry as "nightly".
+build:nightly:
+  extends: .build
+  artifacts:
+    paths:
+      - dist/git-sentinel
+    expire_in: 3 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# ─────────────────────────────────────────────────| Shared publish template |──
+
+.publish:
+  stage: publish
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl --fail --silent --show-error \
+           --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "dist/$BINARY" \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/$PACKAGE_VERSION/$BINARY"
+
+# ────────────────────────────────────────────────────────────| Publish jobs |──
+
+publish:release:
+  extends: .publish
+  needs: [build]
+  variables:
+    PACKAGE_VERSION: $CI_COMMIT_TAG
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+# Overwrites the single "nightly" entry on every scheduled run.
+publish:nightly:
+  extends: .publish
+  needs: [build:nightly]
+  variables:
+    PACKAGE_VERSION: nightly
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# ─────────────────────────────────────────────────────────────────| Release |──
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: [publish:release]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  script:
+    - |
+      if echo "$CI_COMMIT_TAG" | grep -qE '[-.]alpha\.'; then
+        CHANNEL="alpha"
+      elif echo "$CI_COMMIT_TAG" | grep -qE '[-.]beta\.'; then
+        CHANNEL="beta"
+      else
+        CHANNEL="stable"
+      fi
+      bash scripts/gen-release-notes.sh "$CI_COMMIT_TAG" "$CHANNEL" > release-notes.md
+  release:
+    name: "git-sentinel $CI_COMMIT_TAG"
+    description: "./release-notes.md"
+    tag_name: "$CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: "git-sentinel (Linux x86_64)"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/$CI_COMMIT_TAG/$BINARY"
+          link_type: package
