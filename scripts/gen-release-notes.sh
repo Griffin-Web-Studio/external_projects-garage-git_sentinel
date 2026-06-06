@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Generates release notes for a git-sentinel GitLab Release.
 # Usage: gen-release-notes.sh <tag> <channel>
-set -euo pipefail
+set -eu
 
 TAG=$1
 CHANNEL=$2
