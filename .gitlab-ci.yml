@@ -11,10 +11,11 @@
 #   versioned tag              → build → publish → release
 #   scheduled pipeline (main)  → build → publish (nightly, rolling)
 #
-# Tag conventions:
+# Tag conventions (commitizen semver2 scheme):
 #   v1.2.3             stable release
-#   v1.2.3-alpha.1     alpha pre-release
-#   v1.2.3-beta.1      beta pre-release
+#   v1.2.3-alpha.1     alpha pre-release  (cz bump --prerelease alpha)
+#   v1.2.3-beta.1      beta pre-release   (cz bump --prerelease beta)
+#   v1.2.3-rc.1        release candidate  (cz bump --prerelease rc)
 #
 # Nightly setup:
 #   Go to CI/CD → Schedules in GitLab and create a schedule targeting

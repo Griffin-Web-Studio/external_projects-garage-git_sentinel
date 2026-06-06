@@ -19,11 +19,30 @@ packages = ["src"]
 [dependency-groups]
 dev = [
   "black>=26.3.0",
+  "commitizen>=4.16.3",
   "mypy>=2.1.0",
   "pytest-cov",
   "pre-commit>=4.5.1",
   "pyinstaller>=6.0",
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.0.0"
+version_scheme = "semver2"
+tag_format = "v$version"
+update_changelog_on_bump = true
+changelog_incremental = true
+changelog_merge_prerelease = true
+version_files = ["pyproject.toml:^version", "src/__init__.py:^APP_VERSION"]
+
+# Commit types that appear as sections in CHANGELOG.md.
+# Types omitted here (chore, ci, docs, style, test) are silently excluded.
+[tool.commitizen.change_type_map]
+feat = "Features"
+fix = "Bug Fixes"
+perf = "Performance Improvements"
+refactor = "Refactoring"
 
 [tool.mypy]
 python_version = "3.13"
