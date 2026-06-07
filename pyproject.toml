@@ -36,8 +36,6 @@ changelog_incremental = true
 changelog_merge_prerelease = true
 version_files = ["pyproject.toml:^version", "src/__init__.py:^APP_VERSION"]
 
-# Commit types that appear as sections in CHANGELOG.md.
-# Types omitted here (chore, ci, docs, style, test) are silently excluded.
 [tool.commitizen.change_type_map]
 feat = "Features"
 fix = "Bug Fixes"
