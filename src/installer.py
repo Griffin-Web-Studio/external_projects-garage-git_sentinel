@@ -63,6 +63,18 @@ def _render_desktop(exec_cmd: str, extra: str) -> str:
     )
 
 
+def _ask_purge() -> bool:
+    """Prompt interactively; default to keeping data when non-interactive."""
+    if not sys.stdin.isatty():
+        return False
+
+    try:
+        answer = input("\nRemove config and state data? [y/N] ").strip().lower()
+        return answer in ("y", "yes")
+    except EOFError:
+        return False
+
+
 # ───────────────────────────────────────────────────────────────────| State |──
 
 
@@ -145,6 +157,63 @@ def _install_launcher() -> None:
     print(f"Registered launcher\t→ {LAUNCHER_FILE}")
 
 
+# ─────────────────────────────────────────────────────────| Uninstall steps |──
+
+
+def _remove_binary() -> None:
+    """removes the binary"""
+    if BINARY_DST.exists():
+        BINARY_DST.unlink()
+        print(f"Removed binary\t→ {BINARY_DST}")
+    else:
+        print(f"Binary not found\t→ {BINARY_DST}  (skipping)")
+
+
+def _remove_config() -> None:
+    """removes the config dir"""
+    if CONFIG_DIR.exists():
+        shutil.rmtree(CONFIG_DIR)
+        print(f"Removed config\t→ {CONFIG_DIR}")
+    else:
+        print(f"Config not found\t→ {CONFIG_DIR}  (skipping)")
+
+
+def _remove_icon() -> None:
+    """remove icon"""
+    if ICON_FILE.exists():
+        ICON_FILE.unlink()
+        print(f"Removed icon\t→ {ICON_FILE}")
+    else:
+        print(f"Icon not found\t→ {ICON_FILE}  (skipping)")
+
+
+def _remove_autostart() -> None:
+    """remove autostart entry"""
+    if AUTOSTART_FILE.exists():
+        AUTOSTART_FILE.unlink()
+        print(f"Removed autostart\t→ {AUTOSTART_FILE}")
+    else:
+        print(f"Autostart not found\t→ {AUTOSTART_FILE}  (skipping)")
+
+
+def _remove_launcher() -> None:
+    """remove launcher entry"""
+    if LAUNCHER_FILE.exists():
+        LAUNCHER_FILE.unlink()
+        print(f"Removed launcher\t→ {LAUNCHER_FILE}")
+    else:
+        print(f"Launcher not found\t→ {LAUNCHER_FILE}  (skipping)")
+
+
+def _remove_state() -> None:
+    """remove state dir"""
+    if STATE_DIR.exists():
+        shutil.rmtree(STATE_DIR)
+        print(f"Removed state\t→ {STATE_DIR}")
+    else:
+        print(f"State not found\t→ {STATE_DIR}  (skipping)")
+
+
 # ─────────────────────────────────────────────────────────────| Public API  |──
 
 
@@ -164,6 +233,7 @@ def install(*, force: bool = False) -> None:
             f"NOTICE: Linux detected {APP_NAME} will now install.",
             file=sys.stderr,
         )
+
     _install_binary()
     _install_config()
     _install_icon()
@@ -176,3 +246,27 @@ def install(*, force: bool = False) -> None:
     if not force:
         print(f"To run immediately:\t{BINARY_DST} --force")
         print(f"To configure:\t\t$EDITOR {CONFIG_DIR / 'settings.ini'}")
+
+
+def uninstall() -> None:
+    """Public API to initialise application uninstallation"""
+
+    _remove_autostart()
+    _remove_launcher()
+    _remove_icon()
+
+    purge = _ask_purge()
+
+    if purge:
+        _remove_config()
+        _remove_state()
+    else:
+        print()
+        print("Config and run-state left intact:")
+        print(f"  {CONFIG_DIR}")
+        print(f"  {STATE_DIR}")
+
+    _remove_binary()
+
+    print()
+    print("Uninstallation complete.")
