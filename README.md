@@ -6,13 +6,35 @@ Lost work due to corrupted drive, or dead SSD/HDD? Cry no more, data is gone, bu
 
 On each login it scans every git repository under `~/git/` or your preferred location and reports anything that could be lost due to a storage failure: uncommitted changes, untracked files, stashes, unpushed branches, unpushed tags, and repositories with no remote configured. Results are written as a dated report to your Desktop - annoying I know, but on purpose! If nothing is wrong, no report file is created and any previous clean-run reports are moved to an archive.
 
-## Requirements
+## Requirements (end user)
 
-<!-- TODO: determine requirements -->
+- Any Linux desktop (X11 or Wayland)
+- `git` in `PATH`
+
+That's it! no Python, no system packages. The binary is self-contained.
 
 ## Installation
 
-<!-- TODO: add installation instructions -->
+Download the latest binary from the [Releases page](https://gitlab.griffin-studio.dev/external-projects/garage/git-sentinel/-/releases) and run it:
+
+```bash
+./git-sentinel
+```
+
+On the first run the binary detects it is not yet installed and sets itself up automatically:
+
+1. Copies itself to `~/.local/bin/git-sentinel`
+2. Seeds `~/.config/git-sentinel/` with a default `settings.ini` (if not already there)
+3. Registers an XDG autostart entry so it runs on every login
+4. Adds an app launcher entry so it can be opened manually from your app menu
+
+Then exits. From that point `git-sentinel` is on your PATH and will run at login.
+
+**To reinstall or upgrade** - download the new binary and run it with `--install`:
+
+```bash
+./git-sentinel --install
+```
 
 ## First run
 
@@ -58,7 +80,14 @@ For repositories with both `origin` and `upstream` remotes (e.g. a FOSS fork whe
 
 ## File locations
 
-<!-- TODO: add locations -->
+| Path | Purpose |
+|---|---|
+| `~/.local/bin/git-sentinel` | Binary |
+| `~/.config/git-sentinel/settings.ini` | Active configuration |
+| `~/.config/git-sentinel/settings.example.ini` | Reference copy |
+| `~/.config/autostart/git-sentinel.desktop` | XDG autostart entry |
+| `~/.local/share/applications/git-sentinel.desktop` | App launcher entry |
+| `~/.local/share/icons/hicolor/scalable/apps/git-sentinel.svg` | App icon |
 
 ## Uninstalling
 
