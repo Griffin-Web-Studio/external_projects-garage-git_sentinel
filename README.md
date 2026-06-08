@@ -88,11 +88,12 @@ For repositories with both `origin` and `upstream` remotes (e.g. a FOSS fork whe
 | `~/.config/autostart/git-sentinel.desktop` | XDG autostart entry |
 | `~/.local/share/applications/git-sentinel.desktop` | App launcher entry |
 | `~/.local/share/icons/hicolor/scalable/apps/git-sentinel.svg` | App icon |
+| `~/.local/share/git-sentinel/` | State directory (daily lock file, etc.) |
 
 ## Uninstalling
 
 ```bash
-# TODO: add instructions
+git-sentinel --uninstall
 ```
 
 Reports in `~/git/reports/` and on the Desktop are left in place.
