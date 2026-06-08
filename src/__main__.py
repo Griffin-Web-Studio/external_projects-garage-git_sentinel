@@ -5,6 +5,7 @@ import sys
 
 from src.config import load_config
 from src.installer import install, is_installed, uninstall
+from src.schedule import should_run_today
 
 from . import APP_NAME
 
@@ -59,8 +60,8 @@ def main() -> None:
 
     cfg = load_config()
 
-    # TODO: Lock Test - early exit
-    print("Check if software already run today, early exit if so")
+    if not should_run_today(cfg, force=args.force):
+        sys.exit(0)
 
     # TODO: App init/GUI loop
     print("Start Check/GUI loop")
