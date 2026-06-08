@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from src.installer import install, is_installed
+
 from . import APP_NAME
 
 # ────────────────────────────────────────────────────────────────────| Main |──
@@ -41,8 +43,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.install:
-        # TODO: Add Install Logic
-        print("Install Software")
+        install(force=True)
         sys.exit(0)
 
     if args.uninstall:
@@ -50,8 +51,11 @@ def main() -> None:
         print("Uninstall Software")
         sys.exit(0)
 
-    # TODO: Detect First Run
-    print("Detect first run")
+    if getattr(sys, "frozen", False) and not is_installed():
+        print(f"{APP_NAME}: first run detected - installing...")
+        print()
+        install()
+        sys.exit(0)
 
     # TODO: Load Configs
     print("Load Configs")
