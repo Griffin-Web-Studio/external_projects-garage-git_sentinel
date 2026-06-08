@@ -41,6 +41,12 @@ def _resource(name: str) -> Path:
 
 
 def _current_binary() -> Path:
+    """get's either normalised binary location or (in development) script entry
+    point
+
+    Returns:
+        Path: location of binary/script
+    """
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve()
 
@@ -98,6 +104,7 @@ def _install_config() -> None:
 
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)  # make config dir
     shutil.copy2(str(example_src), str(example_dst))  # copy example
+
     print(f"Installed example\t→ {example_dst}")
 
     if not config.exists():
@@ -112,20 +119,29 @@ def _install_icon() -> None:
     """Create icons dir, and copy the icon inside."""
     ICONS_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copy2(str(_resource(f"{APP_NAME}.svg")), str(ICON_FILE))
+
     print(f"Installed icon\t\t→ {ICON_FILE}")
 
 
 def _install_autostart() -> None:
+    """Create icons dir, and copy the icon inside."""
+    AUTOSTART_DIR.mkdir(
+        parents=True, exist_ok=True
+    )  # create autostart dir (if missing)
+
     content = _render_desktop(str(BINARY_DST), "X-GNOME-Autostart-enabled=true")
-    AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
-    AUTOSTART_FILE.write_text(content)
+    AUTOSTART_FILE.write_text(content)  # write autostart desktop entry
+
     print(f"Registered autostart\t→ {AUTOSTART_FILE}")
 
 
 def _install_launcher() -> None:
+    """add app launcher entry into launcher"""
+    APPS_DIR.mkdir(parents=True, exist_ok=True)  # create apps dir (if missing)
+
     content = _render_desktop(f"{BINARY_DST} --force", "Categories=Utility;")
-    APPS_DIR.mkdir(parents=True, exist_ok=True)
-    LAUNCHER_FILE.write_text(content)
+    LAUNCHER_FILE.write_text(content)  # write launcher desktop entry
+
     print(f"Registered launcher\t→ {LAUNCHER_FILE}")
 
 
@@ -133,6 +149,11 @@ def _install_launcher() -> None:
 
 
 def install(*, force: bool = False) -> None:
+    """Public API to initialise application installation
+
+    Args:
+        force (bool, optional): force install flag. Defaults to False.
+    """
     if sys.platform != "linux":
         print(
             f"ERROR: {APP_NAME} only supports Linux (for now).", file=sys.stderr
@@ -148,8 +169,10 @@ def install(*, force: bool = False) -> None:
     _install_icon()
     _install_autostart()
     _install_launcher()
-    print()
+
+    print()  # add new line
     print(f"{APP_NAME} installed - will open automatically on next login.")
+
     if not force:
         print(f"To run immediately:\t{BINARY_DST} --force")
         print(f"To configure:\t\t$EDITOR {CONFIG_DIR / 'settings.ini'}")
