@@ -5,8 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXAMPLE_SETTINGS="$SCRIPT_DIR/settings.example.ini"
-LOCAL_SETTINGS="$SCRIPT_DIR/settings.ini"
+EXAMPLE_SETTINGS="$SCRIPT_DIR/src/data/settings.example.ini"
+LOCAL_SETTINGS="$SCRIPT_DIR/src/data/settings.ini"
 
 # ───────────────────────────────────────────────────────| Environment Setup |──
 
