@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src.installer import install, is_installed
+from src.installer import install, is_installed, uninstall
 
 from . import APP_NAME
 
@@ -47,8 +47,7 @@ def main() -> None:
         sys.exit(0)
 
     if args.uninstall:
-        # TODO: Add Uninstall Logic
-        print("Uninstall Software")
+        uninstall()
         sys.exit(0)
 
     if getattr(sys, "frozen", False) and not is_installed():
