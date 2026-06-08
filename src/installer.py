@@ -164,7 +164,7 @@ def _remove_binary() -> None:
     """removes the binary"""
     if BINARY_DST.exists():
         BINARY_DST.unlink()
-        print(f"Removed binary\t→ {BINARY_DST}")
+        print(f"Removed binary\t\t→ {BINARY_DST}")
     else:
         print(f"Binary not found\t→ {BINARY_DST}  (skipping)")
 
@@ -173,7 +173,7 @@ def _remove_config() -> None:
     """removes the config dir"""
     if CONFIG_DIR.exists():
         shutil.rmtree(CONFIG_DIR)
-        print(f"Removed config\t→ {CONFIG_DIR}")
+        print(f"Removed config\t\t→ {CONFIG_DIR}")
     else:
         print(f"Config not found\t→ {CONFIG_DIR}  (skipping)")
 
@@ -182,9 +182,9 @@ def _remove_icon() -> None:
     """remove icon"""
     if ICON_FILE.exists():
         ICON_FILE.unlink()
-        print(f"Removed icon\t→ {ICON_FILE}")
+        print(f"Removed icon\t\t→ {ICON_FILE}")
     else:
-        print(f"Icon not found\t→ {ICON_FILE}  (skipping)")
+        print(f"Icon not found\t\t→ {ICON_FILE}  (skipping)")
 
 
 def _remove_autostart() -> None:
@@ -209,9 +209,9 @@ def _remove_state() -> None:
     """remove state dir"""
     if STATE_DIR.exists():
         shutil.rmtree(STATE_DIR)
-        print(f"Removed state\t→ {STATE_DIR}")
+        print(f"Removed state\t\t→ {STATE_DIR}")
     else:
-        print(f"State not found\t→ {STATE_DIR}  (skipping)")
+        print(f"State not found\t\t→ {STATE_DIR}  (skipping)")
 
 
 # ─────────────────────────────────────────────────────────────| Public API  |──
