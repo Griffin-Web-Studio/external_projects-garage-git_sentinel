@@ -46,3 +46,13 @@ refactor = "Refactoring"
 python_version = "3.13"
 strict = true
 warn_unused_configs = true
+
+[tool.black]
+line-length = 80
+exclude = '''
+/(
+    migrations
+  | venv
+  | .git
+)/
+'''
