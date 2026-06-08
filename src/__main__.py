@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from src.config import load_config
 from src.installer import install, is_installed, uninstall
 
 from . import APP_NAME
@@ -56,8 +57,7 @@ def main() -> None:
         install()
         sys.exit(0)
 
-    # TODO: Load Configs
-    print("Load Configs")
+    cfg = load_config()
 
     # TODO: Lock Test - early exit
     print("Check if software already run today, early exit if so")
