@@ -89,6 +89,8 @@ For repositories with both `origin` and `upstream` remotes (e.g. a FOSS fork whe
 | `~/.local/share/applications/git-sentinel.desktop` | App launcher entry |
 | `~/.local/share/icons/hicolor/scalable/apps/git-sentinel.svg` | App icon |
 | `~/.local/share/git-sentinel/` | State directory (daily lock file, etc.) |
+| `~/Desktop/*-git-status-report.log` | Current reports |
+| `~/git/reports/` | Report archive |
 
 ## Uninstalling
 
