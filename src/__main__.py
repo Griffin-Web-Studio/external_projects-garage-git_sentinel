@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src.config import load_config
+from src.config import get_desktop_path, load_config
 from src.installer import install, is_installed, uninstall
 from src.schedule import should_run_today
 
@@ -65,6 +65,8 @@ def main() -> None:
 
     # TODO: App init/GUI loop
     print("Start Check/GUI loop")
+    # TODO: remove before stable
+    print("user Desktop location: ", get_desktop_path(cfg))
 
 
 if __name__ == "__main__":

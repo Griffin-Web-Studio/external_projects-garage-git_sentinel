@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+from pathlib import Path
 
 from . import CONFIG_FILE
 
@@ -44,3 +45,36 @@ def load_config() -> configparser.ConfigParser:
         cfg.read(CONFIG_FILE)  # update with user values
 
     return cfg
+
+
+def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
+    """Detects user desktop path
+
+    Args:
+        cfg (configparser.ConfigParser): config parser
+
+    Returns:
+        Path: location of desktop dir
+    """
+    try:
+        override = cfg.get("paths", "desktop_override").strip()
+
+        if override:
+            return Path.home() / override  # override exists
+
+    except configparser.NoOptionError, configparser.NoSectionError:
+        pass  # config parser error assume value not set
+
+    # get xdg user-dirs.dirs file path
+    xdg_file = Path.home() / ".config" / "user-dirs.dirs"
+
+    if xdg_file.exists():
+        for line in xdg_file.read_text().splitlines():  # read lines
+            if line.strip().startswith("XDG_DESKTOP_DIR"):  # find desktop loc
+                val = line.split("=", 1)[1].strip().strip('"')  # get value
+
+                # return User XDG desktop path
+                return Path(val.replace("$HOME", str(Path.home())))
+
+    # Make an ass of U and Ming by assuming desktop is where it should be
+    return Path.home() / "Desktop"
