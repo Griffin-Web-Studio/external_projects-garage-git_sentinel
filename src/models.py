@@ -110,8 +110,6 @@ class RepoResult:
 
     Attributes:
         path: Absolute path to the repository root.
-        home: Current user's home directory, used for display path
-            shortening only.
         has_remote: True if at least one remote is configured.
         remotes: Mapping of remote name to fetch URL.
         uncommitted: Porcelain status lines for staged/modified tracked
@@ -128,7 +126,6 @@ class RepoResult:
     """
 
     path: Path
-    home: Path
     has_remote: bool = False
     remotes: dict[str, str] = field(default_factory=dict)
     uncommitted: list[str] = field(default_factory=list)
@@ -165,7 +162,7 @@ class RepoResult:
                 repository is outside the home directory.
         """
         try:
-            return "~/" + str(self.path.relative_to(self.home))
+            return "~/" + str(self.path.relative_to(Path.home()))
         except ValueError:
             return str(self.path)
 
