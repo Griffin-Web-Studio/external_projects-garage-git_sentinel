@@ -260,8 +260,9 @@ class GateHTTP(Gate):
 
     Attributes:
         error: Error string from the failed fetch, shown to the user.
+            Always set at construction time; never empty.
         retry: Set to True by the UI if the user requests a retry.
     """
 
-    error: str = ""
+    error: str
     retry: bool = False
