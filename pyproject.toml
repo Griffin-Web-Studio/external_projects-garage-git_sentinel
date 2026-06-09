@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Daily git repository audit tool for Linux desktops"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = ["gitpython>=3.1.50"]
 
 [project.scripts]
 git-sentinel = "__main__:main"
