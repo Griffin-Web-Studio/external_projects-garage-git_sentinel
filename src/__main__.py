@@ -13,7 +13,7 @@ from . import APP_NAME
 
 
 def main() -> None:
-    """Application Entrypoint"""
+    """Application entry point."""
     parser = argparse.ArgumentParser(
         prog=APP_NAME,
         description=(
