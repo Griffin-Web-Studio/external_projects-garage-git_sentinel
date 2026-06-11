@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
 # ───────────────────────────────────────────────────────────| Domain models |──
 
@@ -263,3 +263,73 @@ class GateHTTP(Gate):
 
     error: str
     retry: bool = False
+
+
+# ────────────────────────────────────────────────────────────| App protocol |──
+
+
+class AppProtocol(Protocol):
+    """Interface the scan worker depends on.
+
+    GitSentinelApp satisfies this structurally - no explicit declaration needed.
+    A future TUIApp would implement the same six methods to run the scan in a
+    terminal environment without touching scan.py.
+    """
+
+    def log(self, text: str) -> None:
+        """Append a line to the output log.
+
+        Args:
+            text (str): Log text
+        """
+        ...
+
+    def set_status(self, text: str) -> None:
+        """Update the top-level status indicator.
+
+        Args:
+            text (str): Status text
+        """
+        ...
+
+    def set_progress(self, pct: float) -> None:
+        """Set progress to *pct* (0.0-100.0).
+
+        Args:
+            pct (float): Progress percentage
+        """
+        ...
+
+    def finish(self, issue_count: int, report_path: Path | None) -> None:
+        """Signal that the scan has completed.
+
+        Args:
+            issue_count (int): Number of issues
+            report_path (Path | None): Path to a report
+        """
+        ...
+
+    def request_ssh(self, url: str, repo_short: str) -> bool:
+        """Block until the user approves or declines an SSH connection.
+
+        Args:
+            url (str): Repo SSH URL
+            repo_short (str): A short name for repo
+
+        Returns:
+            bool: True if approved, False if declined.
+        """
+        ...
+
+    def request_http_retry(self, url: str, repo_short: str, error: str) -> bool:
+        """Block until the user chooses to retry or skip a failed HTTP remote.
+
+        Args:
+            url (str): Repo HTTP URL
+            repo_short (str): A short name for repo
+            error (str): Connection error text
+
+        Returns:
+            bool: True if the user requested a retry, False to skip.
+        """
+        ...
