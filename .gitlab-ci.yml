@@ -2,14 +2,15 @@
 # git-sentinel CI/CD pipeline
 #
 # Stages:
+#   test    - mypy strict + pytest (runs on every pipeline)
 #   build   - compile the PyInstaller binary
 #   publish - upload the binary to the Generic Package Registry
 #   release - create a GitLab Release (tagged builds only)
 #
 # Triggers:
-#   commit / MR                → build only
-#   versioned tag              → build → publish → release
-#   scheduled pipeline (main)  → build → publish (nightly, rolling)
+#   commit / MR                → test → build
+#   versioned tag              → test → build → publish → release
+#   scheduled pipeline (main)  → test → build → publish (nightly, rolling)
 #
 # Tag conventions (commitizen semver2 scheme):
 #   v1.2.3             stable release
@@ -49,7 +50,7 @@ test:
     - pip install uv --quiet
   script:
     - uv sync --frozen --group dev
-    - uv run mypy --strict src/ git-sentinel.py
+    - uv run mypy --strict src/ git-sentinel
     - uv run pytest --cov=src --cov-fail-under=75 --cov-report=term-missing -q
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
