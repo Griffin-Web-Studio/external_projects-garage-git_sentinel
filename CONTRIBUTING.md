@@ -110,10 +110,10 @@ git push origin main --follow-tags
 Accepted pre-release types: `alpha`, `beta`, `rc`.
 
 ```bash
-cz bump --prerelease alpha   # → v1.0.0-alpha.1
-cz bump --prerelease alpha   # → v1.0.0-alpha.2  (subsequent alpha)
-cz bump --prerelease beta    # → v1.0.0-beta.1
-cz bump --prerelease rc      # → v1.0.0-rc.1
+cz bump --prerelease alpha   # → v1.0.0-alpha.0
+cz bump --prerelease alpha   # → v1.0.0-alpha.1  (subsequent alpha)
+cz bump --prerelease beta    # → v1.0.0-beta.0
+cz bump --prerelease rc      # → v1.0.0-rc.0
 cz bump                      # → v1.0.0           (promote to stable)
 git push origin main --follow-tags
 ```
@@ -145,9 +145,9 @@ changes.
 
 | Tag                 | Channel | Notes                            |
 |---------------------|---------|----------------------------------|
-| `v1.0.0-alpha.1`   | alpha   | early testing, may be unstable   |
-| `v1.0.0-beta.1`    | beta    | feature-complete, bugfixes only  |
-| `v1.0.0-rc.1`      | rc      | release candidate                |
+| `v1.0.0-alpha.0`   | alpha   | early testing, may be unstable   |
+| `v1.0.0-beta.0`    | beta    | feature-complete, bugfixes only  |
+| `v1.0.0-rc.0`      | rc      | release candidate                |
 | `v1.0.0`           | stable  | full release                     |
 
 ## Building locally
