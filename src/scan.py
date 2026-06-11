@@ -3,6 +3,8 @@ from __future__ import annotations
 import configparser
 from pathlib import Path
 
+from datetime import datetime
+
 from . import APP_NAME, APP_VERSION
 from .config import get_desktop_path
 from .git_ops import (
@@ -18,6 +20,12 @@ from .git_ops import (
     ssh_host_key,
 )
 from .models import AppProtocol, RemoteCheck, RemoteSkipReason, RepoResult
+from .reports import (
+    collect_issue_keys,
+    format_report,
+    load_previous_issue_keys,
+    manage_reports,
+)
 from .ssh import build_ssh_env, close_ssh_sockets
 
 # ─────────────────────────────────────────────────────────────| Scan worker |──
@@ -333,16 +341,40 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
 
     app.log("")
 
-    # ── Stage 3: Report (not yet implemented) ─────────────────────────────────
+    # ── Stage 3: Report ───────────────────────────────────────────────────────
 
     app.set_status("Stage 3 / 3 - Generating report...")
     app.set_progress(90.0)
     app.log("=== Stage 3: Report ===")
-    app.log("(not yet implemented)")
+
+    archive = home / cfg.get("paths", "reports_archive")
+    prev_keys = load_previous_issue_keys(desktop, archive)
+    curr_keys = collect_issue_keys(results)
+    now = datetime.now()
+    any_issues = bool(curr_keys) or any(r.is_stale for r in results)
+    report_path: Path | None = None
+
+    if any_issues:
+        ext = cfg.get("reports", "report_extension")
+        fname = now.strftime(f"%Y%m%d-%H-%M-%S-git-status-report.{ext}")
+        desktop.mkdir(parents=True, exist_ok=True)
+        report_path = desktop / fname
+        report_path.write_text(
+            format_report(results, prev_keys, curr_keys, cfg, now)
+        )
+        report_path.with_suffix(".issues").write_text(
+            "\n".join(sorted(curr_keys))
+        )
+        app.log(f"Report written -> {report_path}")
+    else:
+        app.log("No issues found - no report generated.")
+
+    retention = cfg.getint("reports", "desktop_retention_days")
+    manage_reports(desktop, archive, retention, not any_issues)
 
     close_ssh_sockets()
 
     issue_count = len([r for r in results if r.has_issues()])
     app.log(f"Done. {issue_count}/{total} repo(s) with issues.")
     app.set_progress(100.0)
-    app.finish(issue_count, None)
+    app.finish(issue_count, report_path)
