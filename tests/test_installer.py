@@ -836,6 +836,31 @@ class TestInstall:
         mock_autostart.assert_called_once()
         mock_launcher.assert_called_once()
 
+    def test_force_false_prints_usage_hints(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """When force=False, run-immediately and configure hints are printed.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'linux'.
+            capsys (pytest.CaptureFixture[str]): Captures stdout.
+        """
+        monkeypatch.setattr(sys, "platform", "linux")
+        with (
+            patch("src.installer._install_binary"),
+            patch("src.installer._install_config"),
+            patch("src.installer._install_icon"),
+            patch("src.installer._install_autostart"),
+            patch("src.installer._install_launcher"),
+        ):
+            install(force=False)
+
+        out = capsys.readouterr().out
+        assert "To run immediately" in out
+        assert "To configure" in out
+
 
 class TestUninstall:
     """Tests the uninstall() public entry point orchestrates all removal

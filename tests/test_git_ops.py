@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -315,6 +316,34 @@ class TestCheckLocalState:
 
         assert "untracked.txt" in untracked
 
+    def test_invalid_path_returns_empty(self, tmp_path: Path) -> None:
+        """A path that is not a git repo returns three empty lists.
+
+        Args:
+            tmp_path (Path): An empty directory with no .git subdirectory.
+        """
+        uncommitted, untracked, stashes = check_local_state(tmp_path)
+
+        assert uncommitted == []
+        assert untracked == []
+        assert stashes == []
+
+    def test_stash_command_error_returns_empty_stashes(
+        self, repo: git.Repo
+    ) -> None:
+        """A GitCommandError from git stash list is swallowed and returns [].
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        mock_repo = MagicMock()
+        mock_repo.git.status.return_value = ""
+        mock_repo.git.stash.side_effect = git.GitCommandError("stash", 128)
+        with patch("src.git_ops.git.Repo", return_value=mock_repo):
+            _, _, stashes = check_local_state(Path(repo.working_dir))
+
+        assert stashes == []
+
 
 # ─────────────────────────────────────────────────────────────| check_stale |──
 
@@ -363,6 +392,21 @@ class TestCheckStale:
             tmp_path (Path): An empty directory that is not a git repository.
         """
         stale, last = check_stale(tmp_path / "not-a-repo", threshold_days=30)
+
+        assert stale is False
+        assert last is None
+
+    def test_empty_log_output_returns_false_none(self, repo: git.Repo) -> None:
+        """When git log returns an empty string the repo is treated as
+        commit-free.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        mock_repo = MagicMock()
+        mock_repo.git.log.return_value = ""
+        with patch("src.git_ops.git.Repo", return_value=mock_repo):
+            stale, last = check_stale(Path(repo.working_dir), threshold_days=30)
 
         assert stale is False
         assert last is None
@@ -526,6 +570,60 @@ class TestFetchRemoteRefs:
         _, kwargs = mock_run.call_args
         assert kwargs.get("env") == custom_env
 
+    def test_timeout_returns_failure(self, repo: git.Repo) -> None:
+        """A subprocess timeout returns (False, {}, set(), 'timed out').
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        with patch(
+            "src.git_ops.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("git", 30),
+        ):
+            success, heads, tags, err = fetch_remote_refs(
+                Path(repo.working_dir), "origin"
+            )
+
+        assert success is False
+        assert heads == {}
+        assert tags == set()
+        assert err == "timed out"
+
+    def test_subprocess_exception_returns_failure(self, repo: git.Repo) -> None:
+        """Any unexpected subprocess error returns (False, {}, set(), message).
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        with patch(
+            "src.git_ops.subprocess.run",
+            side_effect=OSError("connection refused"),
+        ):
+            success, _, _, err = fetch_remote_refs(
+                Path(repo.working_dir), "origin"
+            )
+
+        assert success is False
+        assert "connection refused" in err
+
+    def test_malformed_ls_remote_line_skipped(self, repo: git.Repo) -> None:
+        """Lines in ls-remote output without a tab separator are skipped.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        ls_output = "malformed-line\nabc123\trefs/heads/main\n"
+        with patch("src.git_ops.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout=ls_output, stderr=""
+            )
+            success, heads, _, _ = fetch_remote_refs(
+                Path(repo.working_dir), "origin"
+            )
+
+        assert success is True
+        assert heads == {"main": "abc123"}
+
 
 # ───────────────────────────────────────────────| analyse_branches_and_tags |──
 
@@ -643,3 +741,97 @@ class TestAnalyseBranchesAndTags:
         )
 
         assert ti == []
+
+    def test_branch_ahead_of_non_origin_remote_flagged(
+        self, repo: git.Repo
+    ) -> None:
+        """Without origin, a branch ahead of a non-origin remote is
+        AHEAD_OF_REMOTE.
+
+        Args:
+            repo (git.Repo): Fixture; a second commit is added so the remote
+                             can be set to the first SHA.
+        """
+        first_sha = repo.head.commit.hexsha
+        p = Path(repo.working_dir)
+        (p / "extra.txt").write_text("extra")
+        repo.index.add(["extra.txt"])
+        repo.index.commit("second commit")
+
+        branches = get_local_branches(Path(repo.working_dir))
+        b = branches[0]
+        bi, _ = analyse_branches_and_tags(
+            Path(repo.working_dir),
+            branches,
+            [],
+            {"upstream": {b["name"]: first_sha}},
+            {},
+            False,
+        )
+
+        assert len(bi) == 1
+        assert bi[0].reason is BranchIssueReason.AHEAD_OF_REMOTE
+        assert bi[0].remote == "upstream"
+
+    def test_branch_in_sync_with_non_origin_remote_no_issue(
+        self, repo: git.Repo
+    ) -> None:
+        """Without origin, a branch whose SHA matches the non-origin remote
+        produces no issues.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        branches = get_local_branches(Path(repo.working_dir))
+        b = branches[0]
+        bi, _ = analyse_branches_and_tags(
+            Path(repo.working_dir),
+            branches,
+            [],
+            {"upstream": {b["name"]: b["sha"]}},
+            {},
+            False,
+        )
+
+        assert bi == []
+
+    def test_branch_not_in_any_remote_count_zero_no_issue(
+        self, repo: git.Repo, tmp_path: Path
+    ) -> None:
+        """Without origin, a branch absent from all remotes but with no
+        countable commits produces no issue.
+
+        Uses tmp_path as the counting repo so _count_commits returns 0 via
+        exception handling.
+
+        Args:
+            repo (git.Repo): Fixture providing real BranchInfo objects.
+            tmp_path (Path): Parent of the repo dir; not itself a git repo.
+        """
+        branches = get_local_branches(Path(repo.working_dir))
+        # tmp_path has no .git → _count_commits raises → returns 0
+        bi, _ = analyse_branches_and_tags(tmp_path, branches, [], {}, {}, False)
+
+        assert bi == []
+
+    def test_tag_not_in_non_origin_remote_flagged(self, repo: git.Repo) -> None:
+        """Without origin, a local tag absent from the non-origin remote is
+        reported with that remote's name.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one tag.
+        """
+        repo.create_tag("v2.0.0")
+        tags = get_local_tags(Path(repo.working_dir))
+        _, ti = analyse_branches_and_tags(
+            Path(repo.working_dir),
+            [],
+            tags,
+            {"upstream": {}},
+            {"upstream": set()},
+            False,
+        )
+
+        assert len(ti) == 1
+        assert ti[0].tag == "v2.0.0"
+        assert ti[0].remote == "upstream"
