@@ -28,6 +28,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 
 stages:
+  - test
   - build
   - publish
   - release
@@ -35,6 +36,22 @@ stages:
 variables:
   BINARY:  git-sentinel
   PACKAGE: git-sentinel
+
+# ──────────────────────────────────────────────────────────────────| Test |──
+
+# Runs on every pipeline (commits, MRs, tags, scheduled).
+# mypy strict + pytest with a 75 % coverage gate.
+# No apt packages needed - GUI modules are analysed via typeshed stubs only.
+test:
+  stage: test
+  image: python:3.14
+  before_script:
+    - pip install uv --quiet
+  script:
+    - uv sync --frozen --group dev
+    - uv run mypy --strict src/ git-sentinel.py
+    - uv run pytest --cov=src --cov-fail-under=75 --cov-report=term-missing -q
+  coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
 # ───────────────────────────────────────────────────| Shared build template |──
 
