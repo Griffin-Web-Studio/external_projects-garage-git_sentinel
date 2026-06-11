@@ -17,6 +17,7 @@ repos:
       - id: mypy
         files: ^(src/|git-sentinel\.py)
         args: [--strict]
+        additional_dependencies: ["gitpython>=3.1.50"]
 
   - repo: https://github.com/opensource-nepal/commitlint
     rev: v1.13.3
