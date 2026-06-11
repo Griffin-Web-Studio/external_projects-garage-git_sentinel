@@ -1,6 +1,103 @@
 from __future__ import annotations
 
-from src.git_ops import is_ssh_url, ssh_host_key
+from pathlib import Path
+
+import pytest
+
+from src.git_ops import find_git_repos, is_ssh_url, ssh_host_key
+
+# ──────────────────────────────────────────────────────────| find_git_repos |──
+
+
+class TestFindGitRepos:
+    """Tests find_git_repos locates all git repositories under a root
+    directory."""
+
+    def test_returns_empty_for_nonexistent_root(self, tmp_path: Path) -> None:
+        """A root path that does not exist returns an empty list.
+
+        Args:
+            tmp_path (Path): Temporary directory; the target path is a
+                             missing subdirectory of it.
+        """
+        assert find_git_repos(tmp_path / "missing") == []
+
+    def test_returns_empty_for_root_with_no_repos(self, tmp_path: Path) -> None:
+        """A directory tree with no .git subdirectories returns an empty list.
+
+        Args:
+            tmp_path (Path): Temporary directory with no git repos.
+        """
+        (tmp_path / "project").mkdir()
+
+        assert find_git_repos(tmp_path) == []
+
+    def test_finds_single_repo(self, tmp_path: Path) -> None:
+        """A single .git directory is found and its parent is returned.
+
+        Args:
+            tmp_path (Path): Temporary directory containing one git repo.
+        """
+        repo = tmp_path / "myrepo"
+        (repo / ".git").mkdir(parents=True)
+
+        assert find_git_repos(tmp_path) == [repo]
+
+    def test_finds_multiple_repos(self, tmp_path: Path) -> None:
+        """All repositories in a flat directory are returned.
+
+        Args:
+            tmp_path (Path): Temporary directory containing multiple git repos.
+        """
+        for name in ("alpha", "beta", "gamma"):
+            (tmp_path / name / ".git").mkdir(parents=True)
+
+        result = find_git_repos(tmp_path)
+
+        assert result == sorted(
+            [tmp_path / n for n in ("alpha", "beta", "gamma")]
+        )
+
+    def test_finds_nested_repo(self, tmp_path: Path) -> None:
+        """Repositories nested several levels deep are discovered.
+
+        Args:
+            tmp_path (Path): Temporary directory containing a deeply nested
+                             repo.
+        """
+        nested = tmp_path / "a" / "b" / "repo"
+        (nested / ".git").mkdir(parents=True)
+
+        assert find_git_repos(tmp_path) == [nested]
+
+    def test_results_are_sorted(self, tmp_path: Path) -> None:
+        """The returned list is always in sorted path order.
+
+        Args:
+            tmp_path (Path): Temporary directory containing repos created in
+                             reverse alphabetical order.
+        """
+        for name in ("zebra", "apple", "mango"):
+            (tmp_path / name / ".git").mkdir(parents=True)
+
+        result = find_git_repos(tmp_path)
+
+        assert result == sorted(result)
+
+    def test_ignores_git_files(self, tmp_path: Path) -> None:
+        """A .git file (used by submodules/worktrees) is not treated as a repo
+        root.
+
+        Args:
+            tmp_path (Path): Temporary directory containing a .git file rather
+                             than a .git directory.
+        """
+        repo = tmp_path / "submodule"
+        repo.mkdir()
+        (repo / ".git").write_text("gitdir: ../.git/modules/submodule")
+
+        assert find_git_repos(tmp_path) == []
+
 
 # ──────────────────────────────────────────────────────────────| is_ssh_url |──
 
