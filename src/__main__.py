@@ -1,13 +1,30 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import sys
+import threading
 
-from src.config import get_desktop_path, load_config
+from src.config import load_config
 from src.installer import install, is_installed, uninstall
 from src.schedule import should_run_today
+from .gui.app import GitSentinelApp
+from .models import AppProtocol
 
 from . import APP_NAME
+
+# ───────────────────────────────────────────────────────────────| Scan stub |──
+# TODO: Replace this temp _run_scan with the real implementation.
+
+
+def _run_scan(app: AppProtocol, _cfg: configparser.ConfigParser) -> None:
+    """Placeholder worker - swap for scan.py once ported."""
+    app.set_status("Scanning repositories...")
+    app.set_progress(0.0)
+    app.log("scan.py not yet ported - stub worker running")
+    app.set_progress(100.0)
+    app.finish(0, None)
+
 
 # ────────────────────────────────────────────────────────────────────| Main |──
 
@@ -63,10 +80,10 @@ def main() -> None:
     if not should_run_today(cfg, force=args.force):
         sys.exit(0)
 
-    # TODO: App init/GUI loop
-    print("Start Check/GUI loop")
-    # TODO: remove before stable
-    print("user Desktop location: ", get_desktop_path(cfg))
+    app = GitSentinelApp(cfg)
+    worker = threading.Thread(target=_run_scan, args=(app, cfg), daemon=True)
+    worker.start()
+    app.mainloop()
 
 
 if __name__ == "__main__":
