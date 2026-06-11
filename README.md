@@ -1,5 +1,9 @@
 <img align="right" width="200" src="src/data/git-sentinel.svg" alt="Project Icon">
 
+> [!NOTE]
+> GitHub users note!
+> Project maintained over on Gitlab.com: https://gitlab.com/griffin-web-studio/garage/git-sentinel
+
 # Local Git Sentinel
 
 Lost work due to corrupted drive, or dead SSD/HDD? Cry no more, data is gone, but you've learned your lesson about not pushing your work for days on end. Now you need a daily local git repository audit tool.
