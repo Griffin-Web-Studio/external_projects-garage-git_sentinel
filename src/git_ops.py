@@ -1,5 +1,29 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+# ──────────────────────────────────────────────────────────| Repo discovery |──
+
+
+def find_git_repos(root: Path) -> list[Path]:
+    """Return all git repository roots found recursively under *root*.
+
+    Traverses the directory tree looking for `.git` directories and returns
+    the parent of each one. The result is sorted so callers get a stable,
+    predictable order regardless of filesystem traversal order.
+
+    Args:
+        root (Path): Directory to search. Returns an empty list if the path
+            does not exist or is not a directory.
+
+    Returns:
+        list[Path]: Sorted list of repository root paths.
+    """
+    if not root.is_dir():
+        return []
+    return sorted(p.parent for p in root.rglob(".git") if p.is_dir())
+
+
 # ──────────────────────────────────────────────────────────| SSH URL helpers |──
 
 
