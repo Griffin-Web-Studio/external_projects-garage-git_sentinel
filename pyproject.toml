@@ -42,6 +42,10 @@ fix = "Bug Fixes"
 perf = "Performance Improvements"
 refactor = "Refactoring"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
 [tool.mypy]
 python_version = "3.14"
 strict = true
