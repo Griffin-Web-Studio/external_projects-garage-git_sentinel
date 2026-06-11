@@ -1,10 +1,41 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import git
 import pytest
 
-from src.git_ops import find_git_repos, is_ssh_url, ssh_host_key
+from src.git_ops import (
+    analyse_branches_and_tags,
+    check_local_state,
+    check_stale,
+    fetch_remote_refs,
+    find_git_repos,
+    get_local_branches,
+    get_local_tags,
+    get_remotes,
+    is_ssh_url,
+    ssh_host_key,
+)
+from src.models import BranchIssueReason, TagIssueReason
+
+# ────────────────────────────────────────────────────────────────| Fixtures |──
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> git.Repo:
+    """A git repository with one commit, ready for local-inspection tests."""
+    r = git.Repo.init(tmp_path / "repo")
+    with r.config_writer() as cfg:
+        cfg.set_value("user", "name", "Test User")
+        cfg.set_value("user", "email", "test@example.com")
+    p = Path(r.working_dir)
+    (p / "file.txt").write_text("hello")
+    r.index.add(["file.txt"])
+    r.index.commit("initial commit")
+    return r
+
 
 # ──────────────────────────────────────────────────────────| find_git_repos |──
 
@@ -180,3 +211,435 @@ class TestSshHostKey:
             ssh_host_key(url)
             == "git@gws-uk-server-gitlab.node.griffin-web.services:34122"
         )
+
+
+# ─────────────────────────────────────────────────────────────| get_remotes |──
+
+
+class TestGetRemotes:
+    """Tests get_remotes returns the correct remote name → URL mapping."""
+
+    def test_no_remotes_returns_empty(self, repo: git.Repo) -> None:
+        """A freshly initialised repo with no remotes returns an empty dict.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        assert get_remotes(Path(repo.working_dir)) == {}
+
+    def test_returns_remote_url(self, repo: git.Repo) -> None:
+        """A configured remote is returned with the correct name and URL.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        url = "https://github.com/test/repo.git"
+        repo.create_remote("origin", url)
+
+        assert get_remotes(Path(repo.working_dir)) == {"origin": url}
+
+    def test_returns_multiple_remotes(self, repo: git.Repo) -> None:
+        """All configured remotes are returned when more than one exists.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        repo.create_remote("origin", "https://github.com/test/repo.git")
+        repo.create_remote("upstream", "https://github.com/upstream/repo.git")
+        result = get_remotes(Path(repo.working_dir))
+
+        assert set(result.keys()) == {"origin", "upstream"}
+
+    def test_invalid_path_returns_empty(self, tmp_path: Path) -> None:
+        """A path that is not a git repository returns an empty dict.
+
+        Args:
+            tmp_path (Path): An empty directory that is not a git repository.
+        """
+        assert get_remotes(tmp_path / "not-a-repo") == {}
+
+
+# ───────────────────────────────────────────────────────| check_local_state |──
+
+
+class TestCheckLocalState:
+    """Tests check_local_state correctly classifies working tree changes."""
+
+    def test_clean_repo_returns_empty(self, repo: git.Repo) -> None:
+        """A clean working tree returns three empty lists.
+
+        Args:
+            repo (git.Repo): Fixture providing a clean repo with one commit.
+        """
+        uncommitted, untracked, stashes = check_local_state(
+            Path(repo.working_dir)
+        )
+
+        assert uncommitted == []
+        assert untracked == []
+        assert stashes == []
+
+    def test_unstaged_modification_in_uncommitted(self, repo: git.Repo) -> None:
+        """A modified tracked file that is not yet staged appears in
+        uncommitted.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        (Path(repo.working_dir) / "file.txt").write_text("modified")
+        uncommitted, _, _ = check_local_state(Path(repo.working_dir))
+
+        assert any("file.txt" in entry for entry in uncommitted)
+
+    def test_staged_file_in_uncommitted(self, repo: git.Repo) -> None:
+        """A newly staged file appears in uncommitted.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        new = Path(repo.working_dir) / "new.txt"
+        new.write_text("new")
+        repo.index.add(["new.txt"])
+        uncommitted, _, _ = check_local_state(Path(repo.working_dir))
+
+        assert any("new.txt" in entry for entry in uncommitted)
+
+    def test_untracked_file_in_untracked(self, repo: git.Repo) -> None:
+        """A file that has never been staged appears in the untracked list.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        (Path(repo.working_dir) / "untracked.txt").write_text("new")
+        _, untracked, _ = check_local_state(Path(repo.working_dir))
+
+        assert "untracked.txt" in untracked
+
+
+# ─────────────────────────────────────────────────────────────| check_stale |──
+
+
+class TestCheckStale:
+    """Tests check_stale correctly identifies repositories with old commits."""
+
+    def test_recent_commit_is_not_stale(self, repo: git.Repo) -> None:
+        """A repo with a commit made moments ago is not stale at 365 days.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo whose commit was just
+                             made.
+        """
+        stale, last = check_stale(Path(repo.working_dir), threshold_days=365)
+
+        assert stale is False
+        assert last is not None
+
+    def test_zero_threshold_is_stale(self, repo: git.Repo) -> None:
+        """Any commit satisfies a threshold of 0 days, so the repo is stale.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        stale, _ = check_stale(Path(repo.working_dir), threshold_days=0)
+
+        assert stale is True
+
+    def test_returns_last_commit_datetime(self, repo: git.Repo) -> None:
+        """The returned datetime is a valid datetime instance.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        from datetime import datetime
+
+        _, last = check_stale(Path(repo.working_dir), threshold_days=365)
+
+        assert isinstance(last, datetime)
+
+    def test_invalid_path_returns_false(self, tmp_path: Path) -> None:
+        """A path that is not a git repository returns (False, None).
+
+        Args:
+            tmp_path (Path): An empty directory that is not a git repository.
+        """
+        stale, last = check_stale(tmp_path / "not-a-repo", threshold_days=30)
+
+        assert stale is False
+        assert last is None
+
+
+# ──────────────────────────────────────────────────────| get_local_branches |──
+
+
+class TestGetLocalBranches:
+    """Tests get_local_branches returns accurate branch metadata."""
+
+    def test_returns_current_branch(self, repo: git.Repo) -> None:
+        """The current branch is present in the returned list.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        branches = get_local_branches(Path(repo.working_dir))
+
+        assert len(branches) >= 1
+
+    def test_sha_is_full_40_chars(self, repo: git.Repo) -> None:
+        """Each branch SHA is the full 40-character hexadecimal hash.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        for b in get_local_branches(Path(repo.working_dir)):
+            assert len(b["sha"]) == 40
+
+    def test_sha_matches_repo_head(self, repo: git.Repo) -> None:
+        """The branch SHA matches the HEAD commit of that branch.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        head_sha = repo.head.commit.hexsha
+        branches = get_local_branches(Path(repo.working_dir))
+
+        assert any(b["sha"] == head_sha for b in branches)
+
+    def test_invalid_path_returns_empty(self, tmp_path: Path) -> None:
+        """A path that is not a git repository returns an empty list.
+
+        Args:
+            tmp_path (Path): An empty directory that is not a git repository.
+        """
+        assert get_local_branches(tmp_path / "not-a-repo") == []
+
+
+# ──────────────────────────────────────────────────────────| get_local_tags |──
+
+
+class TestGetLocalTags:
+    """Tests get_local_tags returns the correct set of tag names."""
+
+    def test_no_tags_returns_empty(self, repo: git.Repo) -> None:
+        """A repo with no tags returns an empty list.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with no tags.
+        """
+        assert get_local_tags(Path(repo.working_dir)) == []
+
+    def test_lightweight_tag_returned(self, repo: git.Repo) -> None:
+        """A lightweight tag is included in the returned list.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        repo.create_tag("v1.0.0")
+
+        assert "v1.0.0" in get_local_tags(Path(repo.working_dir))
+
+    def test_multiple_tags_returned(self, repo: git.Repo) -> None:
+        """All tags are returned when more than one exists.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        repo.create_tag("v1.0.0")
+        repo.create_tag("v1.1.0")
+        tags = get_local_tags(Path(repo.working_dir))
+
+        assert "v1.0.0" in tags
+        assert "v1.1.0" in tags
+
+    def test_invalid_path_returns_empty(self, tmp_path: Path) -> None:
+        """A path that is not a git repository returns an empty list.
+
+        Args:
+            tmp_path (Path): An empty directory that is not a git repository.
+        """
+        assert get_local_tags(tmp_path / "not-a-repo") == []
+
+
+# ───────────────────────────────────────────────────────| fetch_remote_refs |──
+
+
+class TestFetchRemoteRefs:
+    """Tests fetch_remote_refs correctly parses ls-remote output."""
+
+    def test_parses_branches_and_tags(self, repo: git.Repo) -> None:
+        """Branch and tag refs are extracted; peeled tags (^{}) are ignored.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        ls_output = (
+            "abc123\trefs/heads/main\n"
+            "def456\trefs/tags/v1.0.0\n"
+            "ghi789\trefs/tags/v1.0.0^{}\n"
+        )
+        with patch("src.git_ops.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout=ls_output, stderr=""
+            )
+            success, heads, tags, err = fetch_remote_refs(
+                Path(repo.working_dir), "origin"
+            )
+
+        assert success is True
+        assert heads == {"main": "abc123"}
+        assert tags == {"v1.0.0"}
+        assert err == ""
+
+    def test_returns_failure_on_nonzero_exit(self, repo: git.Repo) -> None:
+        """Returns (False, {}, set(), error) when git exits with a non-zero
+        code.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        with patch("src.git_ops.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=128, stdout="", stderr="not found"
+            )
+            success, heads, tags, err = fetch_remote_refs(
+                Path(repo.working_dir), "origin"
+            )
+
+        assert success is False
+        assert heads == {}
+        assert tags == set()
+        assert "not found" in err
+
+    def test_env_passed_to_subprocess(self, repo: git.Repo) -> None:
+        """The env dict is forwarded to subprocess.run for SSH ControlMaster
+        use.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo (path used only).
+        """
+        custom_env = {"GIT_SSH_COMMAND": "ssh -o ControlMaster=auto"}
+        with patch("src.git_ops.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="", stderr=""
+            )
+            fetch_remote_refs(Path(repo.working_dir), "origin", env=custom_env)
+
+        _, kwargs = mock_run.call_args
+        assert kwargs.get("env") == custom_env
+
+
+# ───────────────────────────────────────────────| analyse_branches_and_tags |──
+
+
+class TestAnalyseBranchesAndTags:
+    """Tests analyse_branches_and_tags identifies branch and tag issues
+    correctly."""
+
+    def test_branch_in_sync_with_origin_no_issues(self, repo: git.Repo) -> None:
+        """A branch whose SHA matches origin produces no branch issues.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        branches = get_local_branches(Path(repo.working_dir))
+        b = branches[0]
+        remote_heads = {"origin": {b["name"]: b["sha"]}}
+        bi, ti = analyse_branches_and_tags(
+            Path(repo.working_dir), branches, [], remote_heads, {}, True
+        )
+
+        assert bi == []
+        assert ti == []
+
+    def test_branch_not_in_origin_flagged(self, repo: git.Repo) -> None:
+        """A local branch absent from origin is reported as NOT_IN_ORIGIN.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        branches = get_local_branches(Path(repo.working_dir))
+        bi, _ = analyse_branches_and_tags(
+            Path(repo.working_dir), branches, [], {"origin": {}}, {}, True
+        )
+
+        assert len(bi) == 1
+        assert bi[0].reason is BranchIssueReason.NOT_IN_ORIGIN
+
+    def test_branch_ahead_of_origin_flagged(self, repo: git.Repo) -> None:
+        """A branch whose SHA differs from origin is reported as
+        AHEAD_OF_ORIGIN.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit; a second
+                             commit is added so origin can be set to the first.
+        """
+        # Record the first commit SHA before adding a second
+        first_sha = repo.head.commit.hexsha
+        p = Path(repo.working_dir)
+        (p / "file2.txt").write_text("extra")
+        repo.index.add(["file2.txt"])
+        repo.index.commit("second commit")
+
+        branches = get_local_branches(Path(repo.working_dir))
+        b = branches[0]
+        # Origin is stuck at the first commit; local is one ahead
+        remote_heads = {"origin": {b["name"]: first_sha}}
+        bi, _ = analyse_branches_and_tags(
+            Path(repo.working_dir), branches, [], remote_heads, {}, True
+        )
+
+        assert len(bi) == 1
+        assert bi[0].reason is BranchIssueReason.AHEAD_OF_ORIGIN
+
+    def test_branch_not_in_any_remote_flagged(self, repo: git.Repo) -> None:
+        """Without origin, a branch absent from all remotes is flagged.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one commit.
+        """
+        branches = get_local_branches(Path(repo.working_dir))
+        bi, _ = analyse_branches_and_tags(
+            Path(repo.working_dir), branches, [], {}, {}, False
+        )
+
+        assert len(bi) == 1
+        assert bi[0].reason is BranchIssueReason.NOT_IN_ANY_REMOTE
+
+    def test_tag_not_in_origin_flagged(self, repo: git.Repo) -> None:
+        """A local tag absent from origin is reported as NOT_IN_REMOTE.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one tag.
+        """
+        repo.create_tag("v1.0.0")
+        tags = get_local_tags(Path(repo.working_dir))
+        _, ti = analyse_branches_and_tags(
+            Path(repo.working_dir),
+            [],
+            tags,
+            {"origin": {}},
+            {"origin": set()},
+            True,
+        )
+
+        assert len(ti) == 1
+        assert ti[0].tag == "v1.0.0"
+        assert ti[0].reason is TagIssueReason.NOT_IN_REMOTE
+
+    def test_tag_in_origin_no_issue(self, repo: git.Repo) -> None:
+        """A local tag that is also present in origin produces no tag issues.
+
+        Args:
+            repo (git.Repo): Fixture providing a repo with one tag.
+        """
+        repo.create_tag("v1.0.0")
+        tags = get_local_tags(Path(repo.working_dir))
+        _, ti = analyse_branches_and_tags(
+            Path(repo.working_dir),
+            [],
+            tags,
+            {"origin": {}},
+            {"origin": {"v1.0.0"}},
+            True,
+        )
+
+        assert ti == []
