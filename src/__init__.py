@@ -6,7 +6,7 @@ from pathlib import Path
 
 # ────────────────────────────────────────────────────────────────────| Meta |──
 
-APP_VERSION = "0.0.0"
+APP_VERSION = "0.1.0-beta.0"
 APP_NAME = "git-sentinel"
 
 CONFIG_DIR = Path.home() / ".config" / APP_NAME
