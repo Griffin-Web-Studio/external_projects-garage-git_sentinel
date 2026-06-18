@@ -1,10 +1,3 @@
----
-name: Documentation
-about: Report missing, incorrect, or unclear documentation
-labels: documentation, triage
-assignees: rihards-simanovics
----
-
 ## Summary
 
 <!-- What documentation is missing or needs improvement? -->
@@ -24,3 +17,6 @@ assignees: rihards-simanovics
 ## Additional Context
 
 <!-- Any other context or references. -->
+
+/label ~documentation ~triage
+/assign @rihards-simanovics

@@ -1,10 +1,3 @@
----
-name: Code Quality Issue
-about: Report a code smell, technical debt, or maintainability concern
-labels: code-quality, triage
-assignees: rihards-simanovics
----
-
 ## Summary
 
 <!-- Describe the code quality concern. -->
@@ -27,3 +20,6 @@ assignees: rihards-simanovics
 ## Impact
 
 <!-- What risks or maintenance burden does this introduce if left unaddressed? -->
+
+/label ~code-quality ~triage
+/assign @rihards-simanovics

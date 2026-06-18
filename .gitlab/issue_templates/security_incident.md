@@ -1,11 +1,3 @@
----
-name: Security Incident
-about: Report a security vulnerability or incident (confidential)
-labels: security, triage
-assignees: rihards-simanovics
-confidential: true
----
-
 ## Summary
 
 <!-- Briefly describe the security issue. Do not include sensitive details in the title. -->
@@ -40,3 +32,7 @@ confidential: true
 ## Additional Context
 
 <!-- References, CVEs, proof-of-concept code, or any other relevant information. -->
+
+/label ~security ~triage
+/assign @rihards-simanovics
+/confidential

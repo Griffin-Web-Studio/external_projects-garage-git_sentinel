@@ -1,10 +1,3 @@
----
-name: Feature Request
-about: Suggest a new feature or enhancement
-labels: enhancement, triage
-assignees: rihards-simanovics
----
-
 ## Summary
 
 <!-- A clear and concise description of the feature. -->
@@ -24,3 +17,6 @@ assignees: rihards-simanovics
 ## Additional Context
 
 <!-- Mockups, related issues, or any other context. -->
+
+/label ~enhancement ~triage
+/assign @rihards-simanovics

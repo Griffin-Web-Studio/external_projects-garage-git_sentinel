@@ -1,10 +1,3 @@
----
-name: Bug Report
-about: Report something that is not working correctly
-labels: bug, triage
-assignees: rihards-simanovics
----
-
 ## Summary
 
 <!-- A clear and concise description of the bug. -->
@@ -32,3 +25,6 @@ assignees: rihards-simanovics
 ## Additional Context
 
 <!-- Any other context about the problem. -->
+
+/label ~bug ~triage
+/assign @rihards-simanovics
