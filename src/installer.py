@@ -83,6 +83,7 @@ def _ask_purge() -> bool:
     try:
         answer = input("\nRemove config and state data? [y/N] ").strip().lower()
         return answer in ("y", "yes")
+
     except EOFError:
         return False
 
@@ -206,6 +207,7 @@ def _remove_binary() -> None:
     if BINARY_DST.exists():
         BINARY_DST.unlink()
         print(f"Removed binary\t\t→ {BINARY_DST}")
+
     else:
         print(f"Binary not found\t→ {BINARY_DST}  (skipping)")
 
@@ -215,6 +217,7 @@ def _remove_config() -> None:
     if CONFIG_DIR.exists():
         shutil.rmtree(CONFIG_DIR)
         print(f"Removed config\t\t→ {CONFIG_DIR}")
+
     else:
         print(f"Config not found\t→ {CONFIG_DIR}  (skipping)")
 
@@ -224,6 +227,7 @@ def _remove_icon() -> None:
     if ICON_FILE.exists():
         ICON_FILE.unlink()
         print(f"Removed icon\t\t→ {ICON_FILE}")
+
     else:
         print(f"Icon not found\t\t→ {ICON_FILE}  (skipping)")
 
@@ -233,6 +237,7 @@ def _remove_autostart() -> None:
     if AUTOSTART_FILE.exists():
         AUTOSTART_FILE.unlink()
         print(f"Removed autostart\t→ {AUTOSTART_FILE}")
+
     else:
         print(f"Autostart not found\t→ {AUTOSTART_FILE}  (skipping)")
 
@@ -242,6 +247,7 @@ def _remove_launcher() -> None:
     if LAUNCHER_FILE.exists():
         LAUNCHER_FILE.unlink()
         print(f"Removed launcher\t→ {LAUNCHER_FILE}")
+
     else:
         print(f"Launcher not found\t→ {LAUNCHER_FILE}  (skipping)")
 
@@ -251,6 +257,7 @@ def _remove_state() -> None:
     if STATE_DIR.exists():
         shutil.rmtree(STATE_DIR)
         print(f"Removed state\t\t→ {STATE_DIR}")
+
     else:
         print(f"State not found\t\t→ {STATE_DIR}  (skipping)")
 
@@ -311,6 +318,7 @@ def uninstall() -> None:
     if purge:
         _remove_config()
         _remove_state()
+
     else:
         print()
         print("Config and run-state left intact:")
