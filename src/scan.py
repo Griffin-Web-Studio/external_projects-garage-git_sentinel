@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import configparser
-from pathlib import Path
-
+import sys
 from datetime import datetime
+from pathlib import Path
 
 from . import APP_NAME, APP_VERSION
 from .config import get_desktop_path
@@ -284,6 +284,12 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     desktop = get_desktop_path(cfg)
     persist_s = cfg.getint("ssh", "control_persist_seconds")
     use_cm = cfg.getboolean("ssh", "use_control_master")
+    if sys.platform == "win32" and use_cm:
+        app.log(
+            "NOTE: SSH ControlMaster is not supported on Windows"
+            " — using per-connection SSH."
+        )
+        use_cm = False
     stale_days = cfg.getint("staleness", "stale_threshold_days")
 
     app.log(f"{APP_NAME}  v{APP_VERSION}")
