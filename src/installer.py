@@ -1,23 +1,35 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from pathlib import Path
 
 from . import APP_NAME, CONFIG_DIR, STATE_DIR
 
-_LOCAL = Path.home() / ".local"
-BIN_DIR = _LOCAL / "bin"
-BINARY_DST = BIN_DIR / APP_NAME
+if sys.platform == "win32":
+    import winreg as _winreg
 
-AUTOSTART_DIR = Path.home() / ".config" / "autostart"
-AUTOSTART_FILE = AUTOSTART_DIR / f"{APP_NAME}.desktop"
+    _localappdata = Path(
+        os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
+    )
+    BIN_DIR = _localappdata / "Programs" / APP_NAME
+    BINARY_DST = BIN_DIR / f"{APP_NAME}.exe"
+    _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
-APPS_DIR = _LOCAL / "share" / "applications"
-LAUNCHER_FILE = APPS_DIR / f"{APP_NAME}.desktop"
+else:
+    _LOCAL = Path.home() / ".local"
+    BIN_DIR = _LOCAL / "bin"
+    BINARY_DST = BIN_DIR / APP_NAME
 
-ICONS_DIR = _LOCAL / "share" / "icons" / "hicolor" / "scalable" / "apps"
-ICON_FILE = ICONS_DIR / f"{APP_NAME}.svg"
+    AUTOSTART_DIR = Path.home() / ".config" / "autostart"
+    AUTOSTART_FILE = AUTOSTART_DIR / f"{APP_NAME}.desktop"
+
+    APPS_DIR = _LOCAL / "share" / "applications"
+    LAUNCHER_FILE = APPS_DIR / f"{APP_NAME}.desktop"
+
+    ICONS_DIR = _LOCAL / "share" / "icons" / "hicolor" / "scalable" / "apps"
+    ICON_FILE = ICONS_DIR / f"{APP_NAME}.svg"
 
 # ───────────────────────────────────────────────────────────────| Resources |──
 
@@ -147,6 +159,35 @@ def _install_autostart() -> None:
     print(f"Registered autostart\t→ {AUTOSTART_FILE}")
 
 
+if sys.platform == "win32":
+
+    def _install_autostart_windows() -> None:
+        """Add a Run registry value so the app launches at Windows login."""
+        key = _winreg.OpenKey(
+            _winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, _winreg.KEY_SET_VALUE
+        )
+        _winreg.SetValueEx(key, APP_NAME, 0, _winreg.REG_SZ, str(BINARY_DST))
+        _winreg.CloseKey(key)
+
+        print(f"Registered autostart\t→ HKCU\\...\\Run\\{APP_NAME}")
+
+    def _remove_autostart_windows() -> None:
+        """Remove the Run registry value added by _install_autostart_windows."""
+        try:
+            key = _winreg.OpenKey(
+                _winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, _winreg.KEY_SET_VALUE
+            )
+            _winreg.DeleteValue(key, APP_NAME)
+            _winreg.CloseKey(key)
+
+            print(f"Removed autostart\t→ HKCU\\...\\Run\\{APP_NAME}")
+
+        except FileNotFoundError:
+            print(
+                f"Autostart not found\t→ HKCU\\...\\Run\\{APP_NAME}  (skipping)"
+            )
+
+
 def _install_launcher() -> None:
     """add app launcher entry into launcher"""
     APPS_DIR.mkdir(parents=True, exist_ok=True)  # create apps dir (if missing)
@@ -223,37 +264,47 @@ def install(*, force: bool = False) -> None:
     Args:
         force (bool, optional): force install flag. Defaults to False.
     """
-    if sys.platform != "linux":
+    if sys.platform not in ("linux", "win32"):
         print(
-            f"ERROR: {APP_NAME} only supports Linux (for now).", file=sys.stderr
-        )
-        sys.exit(1)
-    elif sys.platform == "linux":
-        print(
-            f"NOTICE: Linux detected {APP_NAME} will now install.",
+            f"ERROR: {APP_NAME} supports Linux and Windows only.",
             file=sys.stderr,
         )
+        sys.exit(1)
+
+    print(
+        f"NOTICE: {sys.platform} detected, installing {APP_NAME}...",
+        file=sys.stderr,
+    )
 
     _install_binary()
     _install_config()
-    _install_icon()
-    _install_autostart()
-    _install_launcher()
 
-    print()  # add new line
+    if sys.platform == "linux":
+        _install_icon()
+        _install_autostart()
+        _install_launcher()
+
+    else:
+        _install_autostart_windows()
+
+    print()
     print(f"{APP_NAME} installed - will open automatically on next login.")
 
     if not force:
         print(f"To run immediately:\t{BINARY_DST} --force")
-        print(f"To configure:\t\t$EDITOR {CONFIG_DIR / 'settings.ini'}")
+        print(f"To configure:\t\t{CONFIG_DIR / 'settings.ini'}")
 
 
 def uninstall() -> None:
     """Public API to initialise application uninstallation"""
 
-    _remove_autostart()
-    _remove_launcher()
-    _remove_icon()
+    if sys.platform == "linux":
+        _remove_autostart()
+        _remove_launcher()
+        _remove_icon()
+
+    else:
+        _remove_autostart_windows()
 
     purge = _ask_purge()
 
