@@ -5,7 +5,8 @@
 > https://gitlab.com/griffin-web-studio/garage/git-sentinel
 
 [![pipeline status](https://gitlab.com/griffin-web-studio/garage/git-sentinel/badges/main/pipeline.svg)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/pipelines)
-[![coverage report](https://gitlab.com/griffin-web-studio/garage/git-sentinel/badges/main/coverage.svg)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs)
+[![coverage: linux](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test&label=coverage%3A+linux)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test)
+[![coverage: windows](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test%3Awindows&label=coverage%3A+windows)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test%3Awindows)
 
 # Local Git Sentinel
 
