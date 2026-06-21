@@ -843,6 +843,40 @@ class TestInstall:
         mock_autostart.assert_called_once()
         mock_launcher.assert_called_once()
 
+    def test_windows_calls_correct_install_steps(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """On Windows, binary/config/windows-autostart are called; Linux-only
+        steps (icon, .desktop launcher) are not.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'win32'
+                and injects a stub for the Windows-only autostart function.
+        """
+        monkeypatch.setattr(sys, "platform", "win32")
+        mock_win_autostart = MagicMock()
+        monkeypatch.setattr(
+            "src.installer._install_autostart_windows",
+            mock_win_autostart,
+            raising=False,
+        )
+
+        with (
+            patch("src.installer._install_binary") as mock_binary,
+            patch("src.installer._install_config") as mock_config,
+            patch("src.installer._install_icon") as mock_icon,
+            patch("src.installer._install_autostart") as mock_autostart,
+            patch("src.installer._install_launcher") as mock_launcher,
+        ):
+            install(force=True)
+
+        mock_binary.assert_called_once()
+        mock_config.assert_called_once()
+        mock_win_autostart.assert_called_once()
+        mock_icon.assert_not_called()
+        mock_autostart.assert_not_called()
+        mock_launcher.assert_not_called()
+
     def test_force_false_prints_usage_hints(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -921,3 +955,94 @@ class TestUninstall:
 
         mock_config.assert_not_called()
         mock_state.assert_not_called()
+
+    def test_windows_calls_windows_remove_autostart(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """On Windows, _remove_autostart_windows is called and Linux-only
+        removal steps (icon, .desktop files) are not.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'win32'
+                and injects a stub for the Windows-only remove function.
+        """
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr("src.installer._ask_purge", lambda: False)
+        mock_win_remove = MagicMock()
+        monkeypatch.setattr(
+            "src.installer._remove_autostart_windows",
+            mock_win_remove,
+            raising=False,
+        )
+
+        with (
+            patch("src.installer._remove_autostart") as mock_autostart,
+            patch("src.installer._remove_launcher") as mock_launcher,
+            patch("src.installer._remove_icon") as mock_icon,
+            patch("src.installer._remove_binary"),
+        ):
+            uninstall()
+
+        mock_win_remove.assert_called_once()
+        mock_autostart.assert_not_called()
+        mock_launcher.assert_not_called()
+        mock_icon.assert_not_called()
+
+
+# ──────────────────────────────────────────────────────────| Windows (win32) |──
+
+
+@windows_only
+class TestInstallAutostartWindows:
+    """Tests _install_autostart_windows registers a Run registry value.
+
+    These tests are skipped on Linux (winreg is unavailable) and run only
+    on the Windows CI runner.
+    """
+
+    def test_writes_run_value_with_app_name(self) -> None:
+        """SetValueEx is called with APP_NAME as the registry value name."""
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._install_autostart_windows()
+
+        call_args = mock_reg.SetValueEx.call_args[0]
+        # SetValueEx(key, value_name, reserved, type, data)
+        assert call_args[1] == APP_NAME
+
+    def test_close_key_always_called(self) -> None:
+        """CloseKey is called after the value is written."""
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._install_autostart_windows()
+
+        mock_reg.CloseKey.assert_called_once()
+
+
+@windows_only
+class TestRemoveAutostartWindows:
+    """Tests _remove_autostart_windows deletes the Run registry value.
+
+    These tests are skipped on Linux (winreg is unavailable) and run only
+    on the Windows CI runner.
+    """
+
+    def test_deletes_value_when_present(self) -> None:
+        """DeleteValue is called with APP_NAME when the Run value exists."""
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._remove_autostart_windows()
+
+        call_args = mock_reg.DeleteValue.call_args[0]
+        assert call_args[1] == APP_NAME
+
+    def test_file_not_found_does_not_raise(self) -> None:
+        """FileNotFoundError from a missing Run value is swallowed gracefully."""
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            mock_reg.DeleteValue.side_effect = FileNotFoundError
+            _mod._remove_autostart_windows()  # must not raise

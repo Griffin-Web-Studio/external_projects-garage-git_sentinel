@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -630,3 +631,31 @@ class TestScan:
         scan(app, cfg)
         all_text = " ".join(app.logs + app.statuses)
         assert "1 repository" in all_text
+
+    def test_windows_disables_control_master_and_logs_warning(
+        self,
+        fake_home: Path,
+        cfg: configparser.ConfigParser,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """On win32 with use_control_master=true, a NOTE is logged and the
+        setting is silently forced off for the rest of the scan.
+
+        The cfg fixture supplies a non-empty desktop_override so
+        get_desktop_path() returns early and never touches the Windows registry.
+
+        Args:
+            fake_home (Path): Temporary HOME; git_root is created inside it.
+            cfg (configparser.ConfigParser): Base scan config.
+            monkeypatch (pytest.MonkeyPatch): Platform override + git op stubs.
+        """
+        (fake_home / "git").mkdir()
+        cfg["ssh"]["use_control_master"] = "true"
+        monkeypatch.setattr(sys, "platform", "win32")
+        self._patch_all(monkeypatch, repos=[])
+        app = FakeApp()
+        scan(app, cfg)
+
+        assert any(
+            "ControlMaster is not supported on Windows" in m for m in app.logs
+        )
