@@ -162,9 +162,9 @@ class RepoResult:
                 repository is outside the home directory.
         """
         try:
-            return "~/" + str(self.path.relative_to(Path.home()))
+            return "~/" + self.path.relative_to(Path.home()).as_posix()
         except ValueError:
-            return str(self.path)
+            return self.path.as_posix()
 
 
 # ────────────────────────────────────────────────────────| UI message types |──
