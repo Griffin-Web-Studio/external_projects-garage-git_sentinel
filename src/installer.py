@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import APP_NAME, CONFIG_DIR, STATE_DIR
+from . import APP_NAME, APP_VERSION, CONFIG_DIR, STATE_DIR
 from .config_template import render_config, wrap_comment
 from .models import ConfigEntry, ConfigSection
 
@@ -22,10 +22,19 @@ if sys.platform == "win32":
     BIN_DIR = _localappdata / "Programs" / APP_NAME
     BINARY_DST = BIN_DIR / f"{APP_NAME}.exe"
     _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    _UNINSTALL_KEY = (
+        rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{APP_NAME}"
+    )
     START_MENU_DIR = (
-        _appdata / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+        _appdata
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs"
+        / APP_NAME
     )
     START_MENU_SHORTCUT = START_MENU_DIR / f"{APP_NAME}.lnk"
+    START_MENU_UNINSTALL = START_MENU_DIR / f"Uninstall {APP_NAME}.lnk"
 
     _SHELL_FOLDERS_KEY = r"Software\Microsoft\Windows\Shell\User Shell Folders"
 
@@ -433,14 +442,83 @@ if sys.platform == "win32":
         )
         print(f"Registered Desktop\t→ {DESKTOP_SHORTCUT}")
 
+    def _install_start_menu_uninstall() -> None:
+        """Create an Uninstall shortcut in the Start Menu subfolder."""
+        _create_lnk(
+            START_MENU_UNINSTALL,
+            BINARY_DST,
+            "--uninstall",
+            f"Uninstall {APP_NAME}",
+        )
+        print(f"Registered uninstall entry\t→ {START_MENU_UNINSTALL}")
+
+    def _install_programs_entry() -> None:
+        """Register the app in Settings > Apps (Add/Remove Programs)."""
+        key = _winreg.CreateKeyEx(
+            _winreg.HKEY_CURRENT_USER,
+            _UNINSTALL_KEY,
+            0,
+            _winreg.KEY_SET_VALUE,
+        )
+        _winreg.SetValueEx(key, "DisplayName", 0, _winreg.REG_SZ, APP_NAME)
+        _winreg.SetValueEx(
+            key,
+            "UninstallString",
+            0,
+            _winreg.REG_SZ,
+            f'"{BINARY_DST}" --uninstall',
+        )
+        _winreg.SetValueEx(
+            key, "DisplayIcon", 0, _winreg.REG_SZ, str(BINARY_DST)
+        )
+        _winreg.SetValueEx(
+            key, "InstallLocation", 0, _winreg.REG_SZ, str(BIN_DIR)
+        )
+        _winreg.SetValueEx(
+            key, "DisplayVersion", 0, _winreg.REG_SZ, APP_VERSION
+        )
+        _winreg.SetValueEx(key, "NoModify", 0, _winreg.REG_DWORD, 1)
+        _winreg.SetValueEx(key, "NoRepair", 0, _winreg.REG_DWORD, 1)
+        _winreg.CloseKey(key)
+        print(f"Registered Programs entry\t→ HKCU\\...\\Uninstall\\{APP_NAME}")
+
     def _remove_start_menu() -> None:
-        """Remove the Start Menu shortcut."""
+        """Remove the main Start Menu shortcut and prune the folder if empty."""
         if START_MENU_SHORTCUT.exists():
             START_MENU_SHORTCUT.unlink()
             print(f"Removed Start Menu\t→ {START_MENU_SHORTCUT}")
-
         else:
             print(f"Start Menu not found\t→ {START_MENU_SHORTCUT}  (skipping)")
+        try:
+            START_MENU_DIR.rmdir()
+        except OSError:
+            pass
+
+    def _remove_start_menu_uninstall() -> None:
+        """Remove the Uninstall shortcut and prune the folder if empty."""
+        if START_MENU_UNINSTALL.exists():
+            START_MENU_UNINSTALL.unlink()
+            print(f"Removed uninstall entry\t→ {START_MENU_UNINSTALL}")
+        else:
+            print(
+                f"Uninstall entry not found\t→ {START_MENU_UNINSTALL}"
+                "  (skipping)"
+            )
+        try:
+            START_MENU_DIR.rmdir()
+        except OSError:
+            pass
+
+    def _remove_programs_entry() -> None:
+        """Remove the app from Settings > Apps (Add/Remove Programs)."""
+        try:
+            _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, _UNINSTALL_KEY)
+            print(f"Removed Programs entry\t→ HKCU\\...\\Uninstall\\{APP_NAME}")
+        except FileNotFoundError:
+            print(
+                f"Programs entry not found\t→ HKCU\\...\\Uninstall\\{APP_NAME}"
+                "  (skipping)"
+            )
 
     def _remove_desktop_shortcut() -> None:
         """Remove the Desktop shortcut if present."""
@@ -563,6 +641,8 @@ def install(*, force: bool = False) -> None:
     else:
         _install_autostart_windows()
         _install_start_menu()
+        _install_start_menu_uninstall()
+        _install_programs_entry()
 
         if _ask_desktop_shortcut():
             _install_desktop_shortcut()
@@ -585,6 +665,8 @@ def uninstall() -> None:
 
     else:
         _remove_autostart_windows()
+        _remove_programs_entry()
+        _remove_start_menu_uninstall()
         _remove_start_menu()
         _remove_desktop_shortcut()
 
