@@ -45,6 +45,10 @@ refactor = "Refactoring"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "linux_only: skip on non-Linux platforms",
+    "windows_only: skip on non-Windows platforms",
+]
 
 [tool.mypy]
 python_version = "3.14"
