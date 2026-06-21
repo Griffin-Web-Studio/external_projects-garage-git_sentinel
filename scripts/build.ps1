@@ -21,6 +21,9 @@ Write-Host "Syncing build dependencies..."
 Set-Location $ProjectRoot
 uv sync --group dev
 
+Write-Host "Generating icon..."
+uv run python scripts\gen-ico.py
+
 Write-Host "Building binary (this may take a minute)..."
 uv run pyinstaller `
     --onefile `
@@ -28,6 +31,7 @@ uv run pyinstaller `
     --distpath dist `
     --workpath build `
     --specpath build `
+    --icon "build\git-sentinel.ico" `
     git-sentinel
 
 if (-not (Test-Path "$ProjectRoot\dist\git-sentinel.exe")) {
