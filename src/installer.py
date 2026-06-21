@@ -267,7 +267,7 @@ def _install_binary() -> None:
     try:
         shutil.copy2(str(src), str(BINARY_DST))
 
-    except shutil.SameFileError:
+    except shutil.SameFileError, PermissionError:
         pass
 
     BINARY_DST.chmod(0o755)
@@ -283,11 +283,11 @@ def _install_config() -> None:
     content = _render_example_config()
 
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    example_dst.write_text(content)
+    example_dst.write_text(content, encoding="utf-8")
     print(f"Installed example\t→ {example_dst}")
 
     if not config.exists():
-        config.write_text(content)
+        config.write_text(content, encoding="utf-8")
         print(f"Created config\t\t→ {config}  (edit to customise)")
         return
 
