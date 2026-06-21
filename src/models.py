@@ -265,6 +265,43 @@ class GateHTTP(Gate):
     retry: bool = False
 
 
+# ─────────────────────────────────────────────| Config template data models |──
+
+
+@dataclass
+class ConfigEntry:
+    """A single key=value entry within a settings file section.
+
+    Attributes:
+        label: The key name written to the file (e.g. `git_root`).
+        default: The default value string (e.g. `git`).
+        description: Human-readable prose rendered as a wrapped comment block
+            above the key. Separate paragraphs with a literal `\\n`; each
+            paragraph is rendered as its own wrapped block divided by a lone `;`
+            line.
+        enabled: When `True` the key is written as `key = value`. When `False`
+            it is commented out as `; key = value`.
+    """
+
+    label: str
+    default: str
+    description: str
+    enabled: bool = True
+
+
+@dataclass
+class ConfigSection:
+    """A named group of ConfigEntry items corresponding to one [section].
+
+    Attributes:
+        name: Section header name without brackets (e.g. `paths`).
+        entries: Ordered list of entries that appear under this section.
+    """
+
+    name: str
+    entries: list[ConfigEntry]
+
+
 # ────────────────────────────────────────────────────────────| App protocol |──
 
 
