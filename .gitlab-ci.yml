@@ -31,12 +31,23 @@
 
 # Prevents duplicate pipelines when pushing to a branch with an open MR.
 # Without this, GitLab fires both a branch pipeline and an MR pipeline.
+#
+# auto_cancel on_new_commit: interruptible - when a new commit is pushed,
+# cancel any running jobs marked interruptible: true (test, build).
+# Publish and release jobs are explicitly marked interruptible: false so
+# they are never cancelled mid-run.
 workflow:
+  auto_cancel:
+    on_new_commit: interruptible
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" # MR pipelines only (suppresses branch pipeline)
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # pushes to main
     - if: $CI_COMMIT_TAG                               # release tags
     - if: $CI_PIPELINE_SOURCE == "schedule"            # nightly
+
+# Mark all jobs interruptible by default; publish/release override this below.
+default:
+  interruptible: true
 
 stages:
   - test
@@ -123,6 +134,7 @@ build:nightly:
 .publish:
   stage: publish
   image: curlimages/curl:latest
+  interruptible: false   # never cancel a mid-flight upload
   script:
     - |
       curl --fail --silent --show-error \
@@ -154,6 +166,7 @@ publish:nightly:
 release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
+  interruptible: false   # never cancel a mid-flight release
   needs: [publish:release]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
