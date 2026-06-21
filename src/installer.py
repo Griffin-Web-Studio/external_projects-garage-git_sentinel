@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -15,9 +16,29 @@ if sys.platform == "win32":
     _localappdata = Path(
         os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
     )
+    _appdata = Path(
+        os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming")
+    )
     BIN_DIR = _localappdata / "Programs" / APP_NAME
     BINARY_DST = BIN_DIR / f"{APP_NAME}.exe"
     _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    START_MENU_DIR = (
+        _appdata / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+    )
+    START_MENU_SHORTCUT = START_MENU_DIR / f"{APP_NAME}.lnk"
+
+    _SHELL_FOLDERS_KEY = r"Software\Microsoft\Windows\Shell\User Shell Folders"
+
+    try:
+        _hkey = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, _SHELL_FOLDERS_KEY)
+        _desktop_val, _ = _winreg.QueryValueEx(_hkey, "Desktop")
+        _winreg.CloseKey(_hkey)
+        _desktop_dir = Path(os.path.expandvars(str(_desktop_val)))
+
+    except OSError:
+        _desktop_dir = Path.home() / "Desktop"
+
+    DESKTOP_SHORTCUT = _desktop_dir / f"{APP_NAME}.lnk"
 
 else:
     _LOCAL = Path.home() / ".local"
@@ -345,6 +366,91 @@ if sys.platform == "win32":
                 f"Autostart not found\t→ HKCU\\...\\Run\\{APP_NAME}  (skipping)"
             )
 
+    def _create_lnk(
+        lnk: Path, target: Path, args: str, description: str
+    ) -> None:
+        """Create a Windows Shell shortcut (.lnk) via PowerShell COM.
+
+        Uses single-quoted PS strings so the paths are not expanded as
+        variables. Windows paths do not contain single quotes so this is safe.
+        """
+        script = (
+            f"$s = (New-Object -ComObject WScript.Shell)"
+            f".CreateShortcut('{lnk}');"
+            f" $s.TargetPath = '{target}';"
+            f" $s.Arguments = '{args}';"
+            f" $s.Description = '{description}';"
+            f" $s.Save()"
+        )
+
+        subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                script,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+    def _install_start_menu() -> None:
+        """Create a Start Menu shortcut so the app is discoverable from the
+        Windows shell."""
+        START_MENU_DIR.mkdir(parents=True, exist_ok=True)
+
+        _create_lnk(
+            START_MENU_SHORTCUT,
+            BINARY_DST,
+            "--force",
+            "Daily git repository audit",
+        )
+        print(f"Registered Start Menu\t→ {START_MENU_SHORTCUT}")
+
+    def _ask_desktop_shortcut() -> bool:
+        """Prompt whether to add a Desktop shortcut; defaults to Yes."""
+        if not sys.stdin.isatty():
+            return True
+
+        try:
+            answer = (
+                input("\nCreate a Desktop shortcut? [Y/n] ").strip().lower()
+            )
+
+            return answer not in ("n", "no")
+
+        except EOFError:
+            return True
+
+    def _install_desktop_shortcut() -> None:
+        """Create a Desktop shortcut alongside the Start Menu entry."""
+        _create_lnk(
+            DESKTOP_SHORTCUT,
+            BINARY_DST,
+            "--force",
+            "Daily git repository audit",
+        )
+        print(f"Registered Desktop\t→ {DESKTOP_SHORTCUT}")
+
+    def _remove_start_menu() -> None:
+        """Remove the Start Menu shortcut."""
+        if START_MENU_SHORTCUT.exists():
+            START_MENU_SHORTCUT.unlink()
+            print(f"Removed Start Menu\t→ {START_MENU_SHORTCUT}")
+
+        else:
+            print(f"Start Menu not found\t→ {START_MENU_SHORTCUT}  (skipping)")
+
+    def _remove_desktop_shortcut() -> None:
+        """Remove the Desktop shortcut if present."""
+        if DESKTOP_SHORTCUT.exists():
+            DESKTOP_SHORTCUT.unlink()
+            print(f"Removed Desktop\t\t→ {DESKTOP_SHORTCUT}")
+
+        else:
+            print(f"Desktop not found\t→ {DESKTOP_SHORTCUT}  (skipping)")
+
 
 if sys.platform == "linux":
 
@@ -456,6 +562,10 @@ def install(*, force: bool = False) -> None:
 
     else:
         _install_autostart_windows()
+        _install_start_menu()
+
+        if _ask_desktop_shortcut():
+            _install_desktop_shortcut()
 
     print()
     print(f"{APP_NAME} installed - will open automatically on next login.")
@@ -475,6 +585,8 @@ def uninstall() -> None:
 
     else:
         _remove_autostart_windows()
+        _remove_start_menu()
+        _remove_desktop_shortcut()
 
     purge = _ask_purge()
 
