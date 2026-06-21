@@ -78,6 +78,7 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
 
     start_menu_dir = tmp_path / "start_menu"
     start_menu_shortcut = start_menu_dir / f"{APP_NAME}.lnk"
+    start_menu_uninstall = start_menu_dir / f"Uninstall {APP_NAME}.lnk"
     desktop_shortcut = tmp_path / f"{APP_NAME}.lnk"
 
     monkeypatch.setattr("src.installer.BIN_DIR", bin_dir)
@@ -105,6 +106,11 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
         "src.installer.START_MENU_SHORTCUT", start_menu_shortcut, raising=False
     )
     monkeypatch.setattr(
+        "src.installer.START_MENU_UNINSTALL",
+        start_menu_uninstall,
+        raising=False,
+    )
+    monkeypatch.setattr(
         "src.installer.DESKTOP_SHORTCUT", desktop_shortcut, raising=False
     )
 
@@ -121,6 +127,7 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
         "icon_file": icon_file,
         "start_menu_dir": start_menu_dir,
         "start_menu_shortcut": start_menu_shortcut,
+        "start_menu_uninstall": start_menu_uninstall,
         "desktop_shortcut": desktop_shortcut,
     }
 
@@ -881,9 +888,21 @@ class TestInstall:
             mock_win_autostart,
             raising=False,
         )
+        mock_start_menu_uninstall = MagicMock()
+        mock_programs_entry = MagicMock()
         monkeypatch.setattr(
             "src.installer._install_start_menu",
             mock_start_menu,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._install_start_menu_uninstall",
+            mock_start_menu_uninstall,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._install_programs_entry",
+            mock_programs_entry,
             raising=False,
         )
         monkeypatch.setattr(
@@ -914,6 +933,8 @@ class TestInstall:
         mock_config.assert_called_once()
         mock_win_autostart.assert_called_once()
         mock_start_menu.assert_called_once()
+        mock_start_menu_uninstall.assert_called_once()
+        mock_programs_entry.assert_called_once()
         mock_ask_desktop.assert_called_once()
         mock_install_desktop.assert_called_once()
         mock_icon.assert_not_called()
@@ -1012,7 +1033,9 @@ class TestUninstall:
         monkeypatch.setattr(sys, "platform", "win32")
         monkeypatch.setattr("src.installer._ask_purge", lambda: False)
         mock_win_remove = MagicMock()
+        mock_remove_programs = MagicMock()
         mock_remove_start_menu = MagicMock()
+        mock_remove_start_menu_uninstall = MagicMock()
         mock_remove_desktop = MagicMock()
         monkeypatch.setattr(
             "src.installer._remove_autostart_windows",
@@ -1020,8 +1043,18 @@ class TestUninstall:
             raising=False,
         )
         monkeypatch.setattr(
+            "src.installer._remove_programs_entry",
+            mock_remove_programs,
+            raising=False,
+        )
+        monkeypatch.setattr(
             "src.installer._remove_start_menu",
             mock_remove_start_menu,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._remove_start_menu_uninstall",
+            mock_remove_start_menu_uninstall,
             raising=False,
         )
         monkeypatch.setattr(
@@ -1043,7 +1076,9 @@ class TestUninstall:
             uninstall()
 
         mock_win_remove.assert_called_once()
+        mock_remove_programs.assert_called_once()
         mock_remove_start_menu.assert_called_once()
+        mock_remove_start_menu_uninstall.assert_called_once()
         mock_remove_desktop.assert_called_once()
         mock_autostart.assert_not_called()
         mock_launcher.assert_not_called()
@@ -1324,3 +1359,165 @@ class TestRemoveDesktopShortcut:
         import src.installer as _mod
 
         _mod._remove_desktop_shortcut()  # must not raise
+
+
+@windows_only
+class TestInstallStartMenuUninstall:
+    """Tests _install_start_menu_uninstall creates the Uninstall shortcut."""
+
+    def test_calls_create_lnk_with_uninstall_path(
+        self, paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_create_lnk is called with START_MENU_UNINSTALL as the first arg.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+            monkeypatch (pytest.MonkeyPatch): Captures _create_lnk calls.
+        """
+        import src.installer as _mod
+
+        mock_lnk = MagicMock()
+        monkeypatch.setattr("src.installer._create_lnk", mock_lnk)
+        _mod._install_start_menu_uninstall()
+
+        mock_lnk.assert_called_once()
+        assert mock_lnk.call_args[0][0] == paths["start_menu_uninstall"]
+
+    def test_uninstall_argument_passed(
+        self, paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The shortcut is created with --uninstall as the arguments string.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+            monkeypatch (pytest.MonkeyPatch): Captures _create_lnk calls.
+        """
+        import src.installer as _mod
+
+        mock_lnk = MagicMock()
+        monkeypatch.setattr("src.installer._create_lnk", mock_lnk)
+        _mod._install_start_menu_uninstall()
+
+        assert mock_lnk.call_args[0][2] == "--uninstall"
+
+
+@windows_only
+class TestInstallProgramsEntry:
+    """Tests _install_programs_entry writes the Uninstall registry key."""
+
+    def test_sets_display_name(self) -> None:
+        """DisplayName is set to APP_NAME in the registry key.
+
+        Uses a mocked _winreg so no real registry writes occur.
+        """
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._install_programs_entry()
+
+        set_calls = {
+            call[0][1]: call[0][4]
+            for call in mock_reg.SetValueEx.call_args_list
+        }
+        assert set_calls["DisplayName"] == APP_NAME
+
+    def test_uninstall_string_contains_binary(self) -> None:
+        """UninstallString embeds the binary path and --uninstall flag.
+
+        Uses a mocked _winreg so no real registry writes occur.
+        """
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._install_programs_entry()
+
+        set_calls = {
+            call[0][1]: call[0][4]
+            for call in mock_reg.SetValueEx.call_args_list
+        }
+        assert "--uninstall" in set_calls["UninstallString"]
+
+    def test_close_key_always_called(self) -> None:
+        """CloseKey is called after all values are written.
+
+        Uses a mocked _winreg so no real registry writes occur.
+        """
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._install_programs_entry()
+
+        mock_reg.CloseKey.assert_called_once()
+
+
+@windows_only
+class TestRemoveStartMenuUninstall:
+    """Tests _remove_start_menu_uninstall deletes the Uninstall shortcut."""
+
+    def test_removes_existing_shortcut(self, paths: dict[str, Path]) -> None:
+        """The Uninstall .lnk file is deleted when it exists.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        paths["start_menu_dir"].mkdir(parents=True, exist_ok=True)
+        paths["start_menu_uninstall"].touch()
+        _mod._remove_start_menu_uninstall()
+
+        assert not paths["start_menu_uninstall"].exists()
+
+    def test_noop_when_shortcut_missing(self, paths: dict[str, Path]) -> None:
+        """No error is raised when the Uninstall shortcut is absent.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        _mod._remove_start_menu_uninstall()  # must not raise
+
+    def test_removes_empty_start_menu_dir(self, paths: dict[str, Path]) -> None:
+        """The Start Menu subfolder is removed when it is empty after cleanup.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        paths["start_menu_dir"].mkdir(parents=True, exist_ok=True)
+        paths["start_menu_uninstall"].touch()
+        _mod._remove_start_menu_uninstall()
+
+        assert not paths["start_menu_dir"].exists()
+
+
+@windows_only
+class TestRemoveProgramsEntry:
+    """Tests _remove_programs_entry deletes the Uninstall registry key."""
+
+    def test_deletes_key_when_present(self) -> None:
+        """DeleteKey is called with the correct uninstall registry path.
+
+        Uses a mocked _winreg so no real registry writes occur.
+        """
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            _mod._remove_programs_entry()
+
+        mock_reg.DeleteKey.assert_called_once()
+        call_args = mock_reg.DeleteKey.call_args[0]
+        assert APP_NAME in call_args[1]
+
+    def test_file_not_found_does_not_raise(self) -> None:
+        """FileNotFoundError from a missing key is swallowed gracefully.
+
+        Uses a mocked _winreg so no real registry writes occur.
+        """
+        import src.installer as _mod
+
+        with patch("src.installer._winreg") as mock_reg:
+            mock_reg.DeleteKey.side_effect = FileNotFoundError
+            _mod._remove_programs_entry()  # must not raise
