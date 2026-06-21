@@ -8,7 +8,8 @@
 #   release - create a GitLab Release (tagged builds only)
 #
 # Triggers:
-#   commit / MR                → test → build
+#   MR                         → test → build
+#   commit on main             → test → build
 #   versioned tag              → test → build → publish → release
 #   scheduled pipeline (main)  → test → build → publish (nightly, rolling)
 #
@@ -28,6 +29,15 @@
 #   /git-sentinel
 # ──────────────────────────────────────────────────────────────────────────────
 
+# Prevents duplicate pipelines when pushing to a branch with an open MR.
+# Without this, GitLab fires both a branch pipeline and an MR pipeline.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # MR pipelines only (suppresses branch pipeline)
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # pushes to main
+    - if: $CI_COMMIT_TAG                               # release tags
+    - if: $CI_PIPELINE_SOURCE == "schedule"            # nightly
+
 stages:
   - test
   - build
@@ -40,9 +50,8 @@ variables:
 
 # ──────────────────────────────────────────────────────────────────| Test |──
 
-# Runs on every pipeline (commits, MRs, tags, scheduled).
-# mypy strict + pytest with a 75 % coverage gate.
-# No apt packages needed - GUI modules are analysed via typeshed stubs only.
+# Runs on every pipeline (MRs, main, tags, scheduled).
+# mypy strict + pytest with a 75% coverage gate.
 test:
   stage: test
   image: python:3.14
@@ -54,9 +63,9 @@ test:
     - uv run pytest --cov=src --cov-fail-under=75 --cov-report=term-missing -q
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
-# Runs on every pipeline. Shell executor on a Windows runner (no Docker image).
-# Skips linux_only tests; runs the windows_only tests that are skipped above.
-# Requires a GitLab runner registered with the "windows" tag.
+# Shell executor on a GitLab-hosted Windows runner.
+# Skips linux_only tests; runs windows_only tests that are skipped above.
+# Excluded from scheduled (nightly) pipelines to conserve compute minutes.
 test:windows:
   stage: test
   tags:
@@ -69,9 +78,9 @@ test:windows:
     - uv run pytest -q -m "not linux_only" --cov=src --cov-report=term-missing
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: always
 
 # ───────────────────────────────────────────────────| Shared build template |──
 
@@ -90,16 +99,13 @@ test:windows:
 
 # ──────────────────────────────────────────────────────────────| Build jobs |──
 
-# Runs on every commit, MR, and tag - but not on scheduled pipelines (those use
-# build:nightly instead to keep artifact naming separate).
+# Runs on MRs, main, and tags - not on scheduled pipelines (build:nightly handles those).
 build:
   extends: .build
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - when: always
 
 # Runs only on scheduled pipelines; artifact expires quickly since it is
 # immediately re-uploaded to the package registry as "nightly".
