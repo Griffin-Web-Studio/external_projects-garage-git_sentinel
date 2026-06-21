@@ -7,6 +7,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src import APP_NAME
+
+linux_only = pytest.mark.skipif(
+    sys.platform != "linux", reason="requires Linux"
+)
+windows_only = pytest.mark.skipif(
+    sys.platform != "win32", reason="requires Windows"
+)
 from src.installer import (
     _ask_purge,
     _current_binary,
@@ -78,12 +85,19 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     monkeypatch.setattr("src.installer.BINARY_DST", binary_dst)
     monkeypatch.setattr("src.installer.CONFIG_DIR", config_dir)
     monkeypatch.setattr("src.installer.STATE_DIR", state_dir)
-    monkeypatch.setattr("src.installer.AUTOSTART_DIR", autostart_dir)
-    monkeypatch.setattr("src.installer.AUTOSTART_FILE", autostart_file)
-    monkeypatch.setattr("src.installer.APPS_DIR", apps_dir)
-    monkeypatch.setattr("src.installer.LAUNCHER_FILE", launcher_file)
-    monkeypatch.setattr("src.installer.ICONS_DIR", icons_dir)
-    monkeypatch.setattr("src.installer.ICON_FILE", icon_file)
+    # Linux-only constants: silently skip on Windows where they don't exist.
+    monkeypatch.setattr(
+        "src.installer.AUTOSTART_DIR", autostart_dir, raising=False
+    )
+    monkeypatch.setattr(
+        "src.installer.AUTOSTART_FILE", autostart_file, raising=False
+    )
+    monkeypatch.setattr("src.installer.APPS_DIR", apps_dir, raising=False)
+    monkeypatch.setattr(
+        "src.installer.LAUNCHER_FILE", launcher_file, raising=False
+    )
+    monkeypatch.setattr("src.installer.ICONS_DIR", icons_dir, raising=False)
+    monkeypatch.setattr("src.installer.ICON_FILE", icon_file, raising=False)
 
     return {
         "bin_dir": bin_dir,
@@ -410,74 +424,60 @@ class TestInstallBinary:
 
 
 class TestInstallConfig:
-    """Tests _install_config deploys example and settings files correctly."""
+    """Tests _install_config generates and deploys config files correctly."""
 
-    def test_copies_example_file(
-        self,
-        paths: dict[str, Path],
-        example_ini: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """The settings.example.ini is always written to CONFIG_DIR.
+    def test_writes_example_file(self, paths: dict[str, Path]) -> None:
+        """settings.example.ini is always written to CONFIG_DIR.
 
         Args:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
-            example_ini (Path): A temp ini file acting as the bundled example
-                                resource.
-            monkeypatch (pytest.MonkeyPatch): Redirects _resource to return
-                                              example_ini.
         """
-        monkeypatch.setattr(
-            "src.installer._resource", lambda _name: example_ini
-        )
         _install_config()
 
         assert (paths["config_dir"] / "settings.example.ini").exists()
 
-    def test_creates_config_when_absent(
-        self,
-        paths: dict[str, Path],
-        example_ini: Path,
-        monkeypatch: pytest.MonkeyPatch,
+    def test_example_file_contains_expected_sections(
+        self, paths: dict[str, Path]
     ) -> None:
-        """settings.ini is created from the example when no config file exists
-        yet.
+        """The generated settings.example.ini contains all standard sections.
 
         Args:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
-            example_ini (Path): A temp ini file acting as the bundled example
-                                resource.
-            monkeypatch (pytest.MonkeyPatch): Redirects _resource to return
-                                              example_ini.
         """
-        monkeypatch.setattr(
-            "src.installer._resource", lambda _name: example_ini
-        )
+        _install_config()
+
+        content = (paths["config_dir"] / "settings.example.ini").read_text()
+        for section in (
+            "[paths]",
+            "[reports]",
+            "[staleness]",
+            "[schedule]",
+            "[ssh]",
+        ):
+            assert section in content
+
+    def test_creates_config_when_absent(self, paths: dict[str, Path]) -> None:
+        """settings.ini is seeded from generated content when absent.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths to
+                                     tmp_path.
+        """
         _install_config()
 
         assert (paths["config_dir"] / "settings.ini").exists()
 
     def test_leaves_existing_config_intact(
-        self,
-        paths: dict[str, Path],
-        example_ini: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, paths: dict[str, Path]
     ) -> None:
-        """An existing settings.ini is not overwritten.
+        """An existing settings.ini is not overwritten on reinstall.
 
         Args:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
-            example_ini (Path): A temp ini file acting as the bundled example
-                                resource.
-            monkeypatch (pytest.MonkeyPatch): Redirects _resource to return
-                                              example_ini.
         """
-        monkeypatch.setattr(
-            "src.installer._resource", lambda _name: example_ini
-        )
         config = paths["config_dir"] / "settings.ini"
         paths["config_dir"].mkdir(parents=True, exist_ok=True)
         config.write_text("[paths]\ngit_root = custom\n")
@@ -490,6 +490,7 @@ class TestInstallConfig:
 # ───────────────────────────────────────────────────────────| _install_icon |──
 
 
+@linux_only
 class TestInstallIcon:
     """Tests _install_icon copies the SVG into the hicolor icon tree."""
 
@@ -521,6 +522,7 @@ class TestInstallIcon:
 # ──────────────────────────────────────────────────────| _install_autostart |──
 
 
+@linux_only
 class TestInstallAutostart:
     """Tests _install_autostart writes the autostart .desktop entry."""
 
@@ -577,6 +579,7 @@ class TestInstallAutostart:
 # ───────────────────────────────────────────────────────| _install_launcher |──
 
 
+@linux_only
 class TestInstallLauncher:
     """Tests _install_launcher writes the applications .desktop entry."""
 
@@ -687,6 +690,7 @@ class TestRemoveConfig:
         _remove_config()  # must not raise
 
 
+@linux_only
 class TestRemoveIcon:
     """Tests _remove_icon deletes the SVG or skips when absent."""
 
@@ -714,6 +718,7 @@ class TestRemoveIcon:
         _remove_icon()  # must not raise
 
 
+@linux_only
 class TestRemoveAutostart:
     """Tests _remove_autostart deletes the autostart entry or skips when
     absent."""
@@ -741,6 +746,7 @@ class TestRemoveAutostart:
         _remove_autostart()  # must not raise
 
 
+@linux_only
 class TestRemoveLauncher:
     """Tests _remove_launcher deletes the launcher entry or skips when
     absent."""
@@ -799,22 +805,23 @@ class TestRemoveState:
 class TestInstall:
     """Tests the install() public entry point orchestrates all install steps."""
 
-    def test_exits_on_non_linux(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """install() calls sys.exit(1) when running on a non-Linux platform.
+    def test_exits_on_unsupported_platform(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """install() calls sys.exit(1) on platforms other than linux/win32.
 
         Args:
-            monkeypatch (pytest.MonkeyPatch): Sets sys.platform to a non-Linux
-                                              value.
+            monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'darwin'.
         """
-        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(sys, "platform", "darwin")
 
         with pytest.raises(SystemExit):
             install()
 
-    def test_calls_all_install_steps(
+    def test_linux_calls_correct_install_steps(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """All five install step functions are called exactly once on Linux.
+        """On Linux, binary/config/icon/autostart/launcher are each called once.
 
         Args:
             monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'linux'.
@@ -866,15 +873,16 @@ class TestUninstall:
     """Tests the uninstall() public entry point orchestrates all removal
     steps."""
 
-    def test_purge_removes_config_and_state(
+    def test_linux_purge_removes_config_and_state(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """When the user approves purge, config and state removal steps are
+        """On Linux with purge approved, config and state removal steps are
         called.
 
         Args:
             monkeypatch (pytest.MonkeyPatch): Makes _ask_purge return True.
         """
+        monkeypatch.setattr(sys, "platform", "linux")
         monkeypatch.setattr("src.installer._ask_purge", lambda: True)
 
         with (
@@ -890,14 +898,15 @@ class TestUninstall:
         mock_config.assert_called_once()
         mock_state.assert_called_once()
 
-    def test_no_purge_skips_config_and_state(
+    def test_linux_no_purge_skips_config_and_state(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """When the user declines purge, config and state are left on disk.
+        """On Linux with purge declined, config and state are left on disk.
 
         Args:
             monkeypatch (pytest.MonkeyPatch): Makes _ask_purge return False.
         """
+        monkeypatch.setattr(sys, "platform", "linux")
         monkeypatch.setattr("src.installer._ask_purge", lambda: False)
 
         with (

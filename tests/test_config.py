@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import configparser
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from src.config import get_desktop_path, load_config
+
+windows_only = pytest.mark.skipif(
+    sys.platform != "win32", reason="requires Windows"
+)
 
 # ─────────────────────────────────────────────────────────────| load_config |──
 
