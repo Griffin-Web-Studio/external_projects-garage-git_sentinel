@@ -294,24 +294,27 @@ def _install_config() -> None:
     print(f"Existing config\t\t→ {config}  (left unchanged)")
 
 
-def _install_icon() -> None:
-    """Create icons dir, and copy the icon inside."""
-    ICONS_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(str(_resource(f"{APP_NAME}.svg")), str(ICON_FILE))
+if sys.platform == "linux":
 
-    print(f"Installed icon\t\t→ {ICON_FILE}")
+    def _install_icon() -> None:
+        """Create icons dir, and copy the icon inside."""
+        ICONS_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(_resource(f"{APP_NAME}.svg")), str(ICON_FILE))
 
+        print(f"Installed icon\t\t→ {ICON_FILE}")
 
-def _install_autostart() -> None:
-    """Create icons dir, and copy the icon inside."""
-    AUTOSTART_DIR.mkdir(
-        parents=True, exist_ok=True
-    )  # create autostart dir (if missing)
+    def _install_autostart() -> None:
+        """Create icons dir, and copy the icon inside."""
+        AUTOSTART_DIR.mkdir(
+            parents=True, exist_ok=True
+        )  # create autostart dir (if missing)
 
-    content = _render_desktop(str(BINARY_DST), "X-GNOME-Autostart-enabled=true")
-    AUTOSTART_FILE.write_text(content)  # write autostart desktop entry
+        content = _render_desktop(
+            str(BINARY_DST), "X-GNOME-Autostart-enabled=true"
+        )
+        AUTOSTART_FILE.write_text(content)  # write autostart desktop entry
 
-    print(f"Registered autostart\t→ {AUTOSTART_FILE}")
+        print(f"Registered autostart\t→ {AUTOSTART_FILE}")
 
 
 if sys.platform == "win32":
@@ -343,14 +346,20 @@ if sys.platform == "win32":
             )
 
 
-def _install_launcher() -> None:
-    """add app launcher entry into launcher"""
-    APPS_DIR.mkdir(parents=True, exist_ok=True)  # create apps dir (if missing)
+if sys.platform == "linux":
 
-    content = _render_desktop(f"{BINARY_DST} --force", "Categories=Utility;")
-    LAUNCHER_FILE.write_text(content)  # write launcher desktop entry
+    def _install_launcher() -> None:
+        """add app launcher entry into launcher"""
+        APPS_DIR.mkdir(
+            parents=True, exist_ok=True
+        )  # create apps dir (if missing)
 
-    print(f"Registered launcher\t→ {LAUNCHER_FILE}")
+        content = _render_desktop(
+            f"{BINARY_DST} --force", "Categories=Utility;"
+        )
+        LAUNCHER_FILE.write_text(content)  # write launcher desktop entry
+
+        print(f"Registered launcher\t→ {LAUNCHER_FILE}")
 
 
 # ─────────────────────────────────────────────────────────| Uninstall steps |──
@@ -376,34 +385,34 @@ def _remove_config() -> None:
         print(f"Config not found\t→ {CONFIG_DIR}  (skipping)")
 
 
-def _remove_icon() -> None:
-    """remove icon"""
-    if ICON_FILE.exists():
-        ICON_FILE.unlink()
-        print(f"Removed icon\t\t→ {ICON_FILE}")
+if sys.platform == "linux":
 
-    else:
-        print(f"Icon not found\t\t→ {ICON_FILE}  (skipping)")
+    def _remove_icon() -> None:
+        """remove icon"""
+        if ICON_FILE.exists():
+            ICON_FILE.unlink()
+            print(f"Removed icon\t\t→ {ICON_FILE}")
 
+        else:
+            print(f"Icon not found\t\t→ {ICON_FILE}  (skipping)")
 
-def _remove_autostart() -> None:
-    """remove autostart entry"""
-    if AUTOSTART_FILE.exists():
-        AUTOSTART_FILE.unlink()
-        print(f"Removed autostart\t→ {AUTOSTART_FILE}")
+    def _remove_autostart() -> None:
+        """remove autostart entry"""
+        if AUTOSTART_FILE.exists():
+            AUTOSTART_FILE.unlink()
+            print(f"Removed autostart\t→ {AUTOSTART_FILE}")
 
-    else:
-        print(f"Autostart not found\t→ {AUTOSTART_FILE}  (skipping)")
+        else:
+            print(f"Autostart not found\t→ {AUTOSTART_FILE}  (skipping)")
 
+    def _remove_launcher() -> None:
+        """remove launcher entry"""
+        if LAUNCHER_FILE.exists():
+            LAUNCHER_FILE.unlink()
+            print(f"Removed launcher\t→ {LAUNCHER_FILE}")
 
-def _remove_launcher() -> None:
-    """remove launcher entry"""
-    if LAUNCHER_FILE.exists():
-        LAUNCHER_FILE.unlink()
-        print(f"Removed launcher\t→ {LAUNCHER_FILE}")
-
-    else:
-        print(f"Launcher not found\t→ {LAUNCHER_FILE}  (skipping)")
+        else:
+            print(f"Launcher not found\t→ {LAUNCHER_FILE}  (skipping)")
 
 
 def _remove_state() -> None:
