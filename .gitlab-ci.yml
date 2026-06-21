@@ -8,10 +8,9 @@
 #   release - create a GitLab Release (tagged builds only)
 #
 # Triggers:
-#   MR                         → test → build
-#   commit on main             → test → build
-#   versioned tag              → test → build → publish → release
-#   scheduled pipeline (main)  → test → build → publish (nightly, rolling)
+#   MR / commit on main        → test (Linux + Windows) → build (Linux only)
+#   versioned tag              → test → build (Linux + Windows) → publish → release
+#   scheduled pipeline (main)  → test (Linux only) → build → publish (nightly, rolling)
 #
 # Tag conventions (commitizen semver2 scheme):
 #   v1.2.3             stable release
@@ -129,6 +128,25 @@ build:nightly:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
+# Windows build - shell executor; PyInstaller auto-appends .exe on Windows. Runs
+# only on release tags to conserve Windows runner minutes. test:windows already
+# validates Windows correctness on MRs and main.
+build:windows:
+  stage: build
+  tags:
+    - saas-windows-medium-amd64
+  before_script:
+    - pip install uv --quiet
+  script:
+    - uv sync --frozen --group dev
+    - pwsh scripts/build.ps1
+  artifacts:
+    paths:
+      - dist/git-sentinel.exe
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
 # ─────────────────────────────────────────────────| Shared publish template |──
 
 .publish:
@@ -152,6 +170,15 @@ publish:release:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
 
+publish:windows:release:
+  extends: .publish
+  needs: [build:windows]
+  variables:
+    PACKAGE_VERSION: $CI_COMMIT_TAG
+    BINARY: git-sentinel.exe
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
 # Overwrites the single "nightly" entry on every scheduled run.
 publish:nightly:
   extends: .publish
@@ -167,7 +194,7 @@ release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   interruptible: false   # never cancel a mid-flight release
-  needs: [publish:release]
+  needs: [publish:release, publish:windows:release]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   script:
@@ -187,5 +214,8 @@ release:
     assets:
       links:
         - name: "git-sentinel (Linux x86_64)"
-          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/$CI_COMMIT_TAG/$BINARY"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/$CI_COMMIT_TAG/git-sentinel"
+          link_type: package
+        - name: "git-sentinel.exe (Windows x86_64)"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/$CI_COMMIT_TAG/git-sentinel.exe"
           link_type: package
