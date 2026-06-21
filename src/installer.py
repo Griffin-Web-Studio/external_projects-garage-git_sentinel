@@ -551,12 +551,44 @@ if sys.platform == "linux":
 
 def _remove_binary() -> None:
     """removes the binary"""
-    if BINARY_DST.exists():
+    if not BINARY_DST.exists():
+        print(f"Binary not found\t→ {BINARY_DST}  (skipping)")
+        return
+
+    if sys.platform == "win32":
+        # Windows locks a running EXE so it cannot be deleted directly.
+        # Rename it first (allowed while running, frees the install path
+        # immediately), then let a detached cmd script delete the renamed
+        # copy and the now-empty directory once this process exits.
+        pending = BINARY_DST.with_name(BINARY_DST.stem + ".uninstalling.exe")
+        BINARY_DST.rename(pending)
+        # PowerShell with -WindowStyle Hidden + CREATE_NO_WINDOW is fully
+        # invisible. Start-Sleep gives this process ~2 s to exit before the
+        # cleanup fires (no cmd / ping required).
+        script = (
+            f"Start-Sleep 2;"
+            f" Remove-Item -Force -LiteralPath '{pending}';"
+            f" Remove-Item -ErrorAction SilentlyContinue '{BIN_DIR}'"
+        )
+        subprocess.Popen(
+            [
+                "powershell",
+                "-WindowStyle",
+                "Hidden",
+                "-NonInteractive",
+                "-NoProfile",
+                "-Command",
+                script,
+            ],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"Scheduled binary removal\t→ {BINARY_DST}")
+    else:
         BINARY_DST.unlink()
         print(f"Removed binary\t\t→ {BINARY_DST}")
-
-    else:
-        print(f"Binary not found\t→ {BINARY_DST}  (skipping)")
 
 
 def _remove_config() -> None:
