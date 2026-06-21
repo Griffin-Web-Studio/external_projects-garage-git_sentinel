@@ -219,6 +219,7 @@ def _scan_repo(
 
     if not result.has_remote:
         app.log("  ! No remote configured")
+        app.log("")
 
         return result
 
@@ -264,6 +265,7 @@ def _scan_repo(
         parts.append(f"{len(result.tag_issues)} tag issue(s)")
 
     app.log(f"  {'!  ' + '; '.join(parts) if parts else 'OK  clean'}")
+    app.log("")
 
     return result
 
