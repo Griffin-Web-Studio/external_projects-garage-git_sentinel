@@ -15,6 +15,11 @@ from . import APP_NAME
 # ────────────────────────────────────────────────────────────────────| Main |──
 
 
+def _pause_if_windows() -> None:
+    if sys.platform == "win32":
+        input("\nPress Enter to close...")
+
+
 def main() -> None:
     """Application entry point."""
     parser = argparse.ArgumentParser(
@@ -49,16 +54,19 @@ def main() -> None:
 
     if args.install:
         install(force=True)
+        _pause_if_windows()
         sys.exit(0)
 
     if args.uninstall:
         uninstall()
+        _pause_if_windows()
         sys.exit(0)
 
     if getattr(sys, "frozen", False) and not is_installed():
         print(f"{APP_NAME}: first run detected - installing...")
         print()
         install()
+        _pause_if_windows()
         sys.exit(0)
 
     cfg = load_config()
