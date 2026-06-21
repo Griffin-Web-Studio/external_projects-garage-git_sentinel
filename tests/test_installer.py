@@ -76,6 +76,10 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     icons_dir = tmp_path / "icons"
     icon_file = icons_dir / f"{APP_NAME}.svg"
 
+    start_menu_dir = tmp_path / "start_menu"
+    start_menu_shortcut = start_menu_dir / f"{APP_NAME}.lnk"
+    desktop_shortcut = tmp_path / f"{APP_NAME}.lnk"
+
     monkeypatch.setattr("src.installer.BIN_DIR", bin_dir)
     monkeypatch.setattr("src.installer.BINARY_DST", binary_dst)
     monkeypatch.setattr("src.installer.CONFIG_DIR", config_dir)
@@ -93,6 +97,16 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     )
     monkeypatch.setattr("src.installer.ICONS_DIR", icons_dir, raising=False)
     monkeypatch.setattr("src.installer.ICON_FILE", icon_file, raising=False)
+    # Windows-only constants: silently skip on Linux where they don't exist.
+    monkeypatch.setattr(
+        "src.installer.START_MENU_DIR", start_menu_dir, raising=False
+    )
+    monkeypatch.setattr(
+        "src.installer.START_MENU_SHORTCUT", start_menu_shortcut, raising=False
+    )
+    monkeypatch.setattr(
+        "src.installer.DESKTOP_SHORTCUT", desktop_shortcut, raising=False
+    )
 
     return {
         "bin_dir": bin_dir,
@@ -105,6 +119,9 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
         "launcher_file": launcher_file,
         "icons_dir": icons_dir,
         "icon_file": icon_file,
+        "start_menu_dir": start_menu_dir,
+        "start_menu_shortcut": start_menu_shortcut,
+        "desktop_shortcut": desktop_shortcut,
     }
 
 
@@ -846,18 +863,37 @@ class TestInstall:
     def test_windows_calls_correct_install_steps(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """On Windows, binary/config/windows-autostart are called; Linux-only
-        steps (icon, .desktop launcher) are not.
+        """On Windows, binary/config/autostart/start-menu are called and the
+        desktop shortcut is created when the user accepts the prompt. Linux-only
+        steps (icon, .desktop launcher) are not called.
 
         Args:
             monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'win32'
-                and injects a stub for the Windows-only autostart function.
+                and injects stubs for all Windows-only install functions.
         """
         monkeypatch.setattr(sys, "platform", "win32")
         mock_win_autostart = MagicMock()
+        mock_start_menu = MagicMock()
+        mock_ask_desktop = MagicMock(return_value=True)
+        mock_install_desktop = MagicMock()
         monkeypatch.setattr(
             "src.installer._install_autostart_windows",
             mock_win_autostart,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._install_start_menu",
+            mock_start_menu,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._ask_desktop_shortcut",
+            mock_ask_desktop,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._install_desktop_shortcut",
+            mock_install_desktop,
             raising=False,
         )
 
@@ -877,6 +913,9 @@ class TestInstall:
         mock_binary.assert_called_once()
         mock_config.assert_called_once()
         mock_win_autostart.assert_called_once()
+        mock_start_menu.assert_called_once()
+        mock_ask_desktop.assert_called_once()
+        mock_install_desktop.assert_called_once()
         mock_icon.assert_not_called()
         mock_autostart.assert_not_called()
         mock_launcher.assert_not_called()
@@ -963,19 +1002,31 @@ class TestUninstall:
     def test_windows_calls_windows_remove_autostart(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """On Windows, _remove_autostart_windows is called and Linux-only
-        removal steps (icon, .desktop files) are not.
+        """On Windows, _remove_autostart_windows, _remove_start_menu, and
+        _remove_desktop_shortcut are called; Linux-only removal steps are not.
 
         Args:
             monkeypatch (pytest.MonkeyPatch): Sets sys.platform to 'win32'
-                and injects a stub for the Windows-only remove function.
+                and injects stubs for all Windows-only remove functions.
         """
         monkeypatch.setattr(sys, "platform", "win32")
         monkeypatch.setattr("src.installer._ask_purge", lambda: False)
         mock_win_remove = MagicMock()
+        mock_remove_start_menu = MagicMock()
+        mock_remove_desktop = MagicMock()
         monkeypatch.setattr(
             "src.installer._remove_autostart_windows",
             mock_win_remove,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._remove_start_menu",
+            mock_remove_start_menu,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "src.installer._remove_desktop_shortcut",
+            mock_remove_desktop,
             raising=False,
         )
 
@@ -992,6 +1043,8 @@ class TestUninstall:
             uninstall()
 
         mock_win_remove.assert_called_once()
+        mock_remove_start_menu.assert_called_once()
+        mock_remove_desktop.assert_called_once()
         mock_autostart.assert_not_called()
         mock_launcher.assert_not_called()
         mock_icon.assert_not_called()
@@ -1055,3 +1108,219 @@ class TestRemoveAutostartWindows:
         with patch("src.installer._winreg") as mock_reg:
             mock_reg.DeleteValue.side_effect = FileNotFoundError
             _mod._remove_autostart_windows()  # must not raise
+
+
+@windows_only
+class TestCreateLnk:
+    """Tests _create_lnk invokes PowerShell with the expected arguments."""
+
+    def test_calls_powershell(self, tmp_path: Path) -> None:
+        """subprocess.run is called with powershell as the first command token.
+
+        Args:
+            tmp_path (Path): Provides paths for lnk and target arguments.
+        """
+        import src.installer as _mod
+
+        lnk = tmp_path / "test.lnk"
+        target = tmp_path / "app.exe"
+
+        with patch("src.installer.subprocess.run") as mock_run:
+            _mod._create_lnk(lnk, target, "--force", "A description")
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "powershell"
+
+    def test_script_contains_target_and_args(self, tmp_path: Path) -> None:
+        """The PowerShell script embeds the target path and arguments string.
+
+        Args:
+            tmp_path (Path): Provides paths for lnk and target arguments.
+        """
+        import src.installer as _mod
+
+        lnk = tmp_path / "test.lnk"
+        target = tmp_path / "app.exe"
+
+        with patch("src.installer.subprocess.run") as mock_run:
+            _mod._create_lnk(lnk, target, "--force", "A description")
+
+        script = mock_run.call_args[0][0][-1]
+        assert str(target) in script
+        assert "--force" in script
+
+
+@windows_only
+class TestInstallStartMenu:
+    """Tests _install_start_menu creates the Start Menu directory and
+    shortcut."""
+
+    def test_creates_start_menu_dir(
+        self, paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """START_MENU_DIR is created when it does not exist.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+            monkeypatch (pytest.MonkeyPatch): Injects a no-op _create_lnk.
+        """
+        import src.installer as _mod
+
+        monkeypatch.setattr("src.installer._create_lnk", MagicMock())
+        _mod._install_start_menu()
+
+        assert paths["start_menu_dir"].is_dir()
+
+    def test_calls_create_lnk(
+        self, paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_create_lnk is called with the Start Menu shortcut path.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+            monkeypatch (pytest.MonkeyPatch): Captures _create_lnk calls.
+        """
+        import src.installer as _mod
+
+        mock_lnk = MagicMock()
+        monkeypatch.setattr("src.installer._create_lnk", mock_lnk)
+        _mod._install_start_menu()
+
+        mock_lnk.assert_called_once()
+        assert mock_lnk.call_args[0][0] == paths["start_menu_shortcut"]
+
+
+@windows_only
+class TestAskDesktopShortcut:
+    """Tests _ask_desktop_shortcut prompt behaviour."""
+
+    def test_non_tty_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Non-interactive stdin defaults to creating the shortcut.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Makes sys.stdin non-TTY.
+        """
+        import src.installer as _mod
+
+        monkeypatch.setattr(sys, "stdin", MagicMock(isatty=lambda: False))
+        assert _mod._ask_desktop_shortcut() is True
+
+    def test_n_returns_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Entering 'n' declines the Desktop shortcut.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Makes stdin a TTY and answers n.
+        """
+        import src.installer as _mod
+
+        monkeypatch.setattr(sys, "stdin", MagicMock(isatty=lambda: True))
+        monkeypatch.setattr("builtins.input", lambda _: "n")
+        assert _mod._ask_desktop_shortcut() is False
+
+    def test_empty_returns_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Pressing Enter (empty answer) accepts the default Yes.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Makes stdin a TTY and answers
+                with an empty string.
+        """
+        import src.installer as _mod
+
+        monkeypatch.setattr(sys, "stdin", MagicMock(isatty=lambda: True))
+        monkeypatch.setattr("builtins.input", lambda _: "")
+        assert _mod._ask_desktop_shortcut() is True
+
+    def test_eof_returns_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """EOFError is caught and treated as Yes.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Makes stdin a TTY and raises EOF.
+        """
+        import src.installer as _mod
+
+        monkeypatch.setattr(sys, "stdin", MagicMock(isatty=lambda: True))
+        monkeypatch.setattr("builtins.input", MagicMock(side_effect=EOFError))
+        assert _mod._ask_desktop_shortcut() is True
+
+
+@windows_only
+class TestInstallDesktopShortcut:
+    """Tests _install_desktop_shortcut delegates to _create_lnk."""
+
+    def test_calls_create_lnk_with_desktop_path(
+        self, paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_create_lnk is called with DESKTOP_SHORTCUT as the first argument.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+            monkeypatch (pytest.MonkeyPatch): Captures _create_lnk calls.
+        """
+        import src.installer as _mod
+
+        mock_lnk = MagicMock()
+        monkeypatch.setattr("src.installer._create_lnk", mock_lnk)
+        _mod._install_desktop_shortcut()
+
+        mock_lnk.assert_called_once()
+        assert mock_lnk.call_args[0][0] == paths["desktop_shortcut"]
+
+
+@windows_only
+class TestRemoveStartMenu:
+    """Tests _remove_start_menu deletes the shortcut or skips gracefully."""
+
+    def test_removes_existing_shortcut(self, paths: dict[str, Path]) -> None:
+        """The Start Menu .lnk file is deleted when it exists.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        paths["start_menu_dir"].mkdir(parents=True, exist_ok=True)
+        paths["start_menu_shortcut"].touch()
+        _mod._remove_start_menu()
+
+        assert not paths["start_menu_shortcut"].exists()
+
+    def test_noop_when_shortcut_missing(self, paths: dict[str, Path]) -> None:
+        """No error is raised when the Start Menu shortcut is absent.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        _mod._remove_start_menu()  # must not raise
+
+
+@windows_only
+class TestRemoveDesktopShortcut:
+    """Tests _remove_desktop_shortcut deletes the shortcut or skips
+    gracefully."""
+
+    def test_removes_existing_shortcut(self, paths: dict[str, Path]) -> None:
+        """The Desktop .lnk file is deleted when it exists.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        paths["desktop_shortcut"].touch()
+        _mod._remove_desktop_shortcut()
+
+        assert not paths["desktop_shortcut"].exists()
+
+    def test_noop_when_shortcut_missing(self, paths: dict[str, Path]) -> None:
+        """No error is raised when the Desktop shortcut is absent.
+
+        Args:
+            paths (dict[str, Path]): Fixture redirecting all installer paths.
+        """
+        import src.installer as _mod
+
+        _mod._remove_desktop_shortcut()  # must not raise
