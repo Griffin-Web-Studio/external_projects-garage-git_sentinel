@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import configparser
-from pathlib import Path
-
+import sys
 from datetime import datetime
+from pathlib import Path
 
 from . import APP_NAME, APP_VERSION
 from .config import get_desktop_path
@@ -219,6 +219,7 @@ def _scan_repo(
 
     if not result.has_remote:
         app.log("  ! No remote configured")
+        app.log("")
 
         return result
 
@@ -264,6 +265,7 @@ def _scan_repo(
         parts.append(f"{len(result.tag_issues)} tag issue(s)")
 
     app.log(f"  {'!  ' + '; '.join(parts) if parts else 'OK  clean'}")
+    app.log("")
 
     return result
 
@@ -284,6 +286,12 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     desktop = get_desktop_path(cfg)
     persist_s = cfg.getint("ssh", "control_persist_seconds")
     use_cm = cfg.getboolean("ssh", "use_control_master")
+    if sys.platform == "win32" and use_cm:
+        app.log(
+            "NOTE: SSH ControlMaster is not supported on Windows"
+            " — using per-connection SSH."
+        )
+        use_cm = False
     stale_days = cfg.getint("staleness", "stale_threshold_days")
 
     app.log(f"{APP_NAME}  v{APP_VERSION}")
@@ -360,10 +368,11 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
         desktop.mkdir(parents=True, exist_ok=True)
         report_path = desktop / fname
         report_path.write_text(
-            format_report(results, prev_keys, curr_keys, cfg, now)
+            format_report(results, prev_keys, curr_keys, cfg, now),
+            encoding="utf-8",
         )
         report_path.with_suffix(".issues").write_text(
-            "\n".join(sorted(curr_keys))
+            "\n".join(sorted(curr_keys)), encoding="utf-8"
         )
         app.log(f"Report written -> {report_path}")
     else:

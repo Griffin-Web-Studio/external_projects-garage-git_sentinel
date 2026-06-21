@@ -54,7 +54,7 @@ def _make_report(directory: Path, stem: str) -> Path:
     return f
 
 
-# ────────────────────────────────────────────────────────| _fmt_branch_issue |──
+# ───────────────────────────────────────────────────────| _fmt_branch_issue |──
 
 
 class TestFmtBranchIssue:
@@ -123,7 +123,7 @@ class TestFmtBranchIssue:
         assert _fmt_branch_issue(bi).startswith("    ")
 
 
-# ─────────────────────────────────────────────────────────| _fmt_skip_reason |──
+# ────────────────────────────────────────────────────────| _fmt_skip_reason |──
 
 
 class TestFmtSkipReason:
@@ -154,7 +154,7 @@ class TestFmtSkipReason:
         assert _fmt_skip_reason(rc) == ""
 
 
-# ─────────────────────────────────────────────────────────| _fmt_stale_entry |──
+# ────────────────────────────────────────────────────────| _fmt_stale_entry |──
 
 
 class TestFmtStaleEntry:
@@ -164,7 +164,7 @@ class TestFmtStaleEntry:
         """Line includes the last commit date and a days-ago count."""
         r = _result(is_stale=True, last_commit_date=datetime(2026, 1, 1))
         line = _fmt_stale_entry(r)
-        assert str(REPO_PATH) in line
+        assert REPO_PATH.as_posix() in line
         assert "2026-01-01" in line
         assert "day(s) ago" in line
 
@@ -172,7 +172,7 @@ class TestFmtStaleEntry:
         """Line includes 'no commits found' when last_commit_date is None."""
         r = _result(is_stale=True, last_commit_date=None)
         line = _fmt_stale_entry(r)
-        assert str(REPO_PATH) in line
+        assert REPO_PATH.as_posix() in line
         assert "no commits found" in line
 
     def test_indented_with_two_spaces(self) -> None:
@@ -216,7 +216,8 @@ class TestCollectIssueKeys:
         assert f"{r.short_path()}|stash|stash@{{0}}: WIP" in keys
 
     def test_branch_issue_key_uses_reason_value(self) -> None:
-        """Branch issue keys use the enum .value string for stable comparison."""
+        """Branch issue keys use the enum .value string for stable
+        comparison."""
         bi = BranchIssue(
             branch="feat",
             remote="origin",
@@ -257,7 +258,7 @@ class TestCollectIssueKeys:
         assert f"{r2.short_path()}|no_remote" in keys
 
 
-# ─────────────────────────────────────────────────| load_previous_issue_keys |──
+# ────────────────────────────────────────────────| load_previous_issue_keys |──
 
 
 class TestLoadPreviousIssueKeys:
@@ -322,7 +323,7 @@ class TestLoadPreviousIssueKeys:
         assert load_previous_issue_keys(desktop, tmp_path / "archive") == set()
 
 
-# ──────────────────────────────────────────────────────────| format_report |──
+# ───────────────────────────────────────────────────────────| format_report |──
 
 
 class TestFormatReport:
@@ -352,7 +353,8 @@ class TestFormatReport:
     def test_persistent_issues_section(
         self, cfg: configparser.ConfigParser
     ) -> None:
-        """Keys present in both prev and curr appear under [persistent_issues]."""
+        """Keys present in both prev and curr appear under
+        [persistent_issues]."""
         prev = {"repo|no_remote"}
         curr = {"repo|no_remote", "repo|uncommitted|file.py"}
         output = format_report([], prev, curr, cfg, NOW)
@@ -370,7 +372,7 @@ class TestFormatReport:
         r = _result(has_remote=False)
         output = format_report([r], set(), set(), cfg, NOW)
         assert "[no_remote]" in output
-        assert str(REPO_PATH) in output
+        assert REPO_PATH.as_posix() in output
 
     def test_uncommitted_section(self, cfg: configparser.ConfigParser) -> None:
         """[uncommitted] section lists repos and their modified files."""
@@ -440,7 +442,7 @@ class TestFormatReport:
         )
         output = format_report([r], set(), set(), cfg, NOW)
         assert "[stale]" in output
-        assert str(REPO_PATH) in output
+        assert REPO_PATH.as_posix() in output
         assert "2025-01-01" in output
         assert "90 day(s)" in output
 
@@ -449,7 +451,7 @@ class TestFormatReport:
         r = _result(has_remote=True)
         output = format_report([r], set(), set(), cfg, NOW)
         assert "[passed]" in output
-        assert str(REPO_PATH) in output
+        assert REPO_PATH.as_posix() in output
 
     def test_empty_sections_omitted(
         self, cfg: configparser.ConfigParser
@@ -463,7 +465,7 @@ class TestFormatReport:
         assert "[stale]" not in output
 
 
-# ────────────────────────────────────────────────────────| manage_reports |──
+# ──────────────────────────────────────────────────────────| manage_reports |──
 
 
 class TestManageReports:

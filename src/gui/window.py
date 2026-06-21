@@ -1,12 +1,27 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import ttk
 import tkinter as tk
 
 from .. import APP_NAME, APP_VERSION
 from ..models import MsgFinish
+
+# ─────────────────────────────────────────────────────────────────| Helpers |──
+
+
+def _open_file(path: Path) -> None:
+    """Open *path* with the default application, cross-platform."""
+    if sys.platform == "win32":
+        os.startfile(path)
+
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
 
 # ───────────────────────────────────────────────────────────────| Main view |──
 
@@ -148,6 +163,7 @@ class MainWindow(tk.Frame):
             )
 
             if msg.report_path and msg.report_path.exists():
+                report_path = msg.report_path
                 row = tk.Frame(self)
                 # pack(before=) inserts the row above the close button
                 # without rebuilding the whole layout
@@ -155,9 +171,7 @@ class MainWindow(tk.Frame):
                 tk.Button(
                     row,
                     text="Open Report",
-                    command=lambda: subprocess.Popen(
-                        ["xdg-open", str(msg.report_path)]
-                    ),
+                    command=lambda: _open_file(report_path),
                 ).pack(side="left", padx=4)
 
             self._close_btn.config(text="Acknowledge & Close", state="normal")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+import sys
 from pathlib import Path
 
 from . import CONFIG_FILE
@@ -63,7 +64,10 @@ def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
             return Path.home() / override  # override exists
 
     except configparser.NoOptionError, configparser.NoSectionError:
-        pass  # config parser error assume value not set
+        pass
+
+    if sys.platform == "win32":
+        return _get_desktop_path_windows()
 
     # get xdg user-dirs.dirs file path
     xdg_file = Path.home() / ".config" / "user-dirs.dirs"
@@ -76,5 +80,24 @@ def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
                 # return User XDG desktop path
                 return Path(val.replace("$HOME", str(Path.home())))
 
-    # Make an ass of U and Ming by assuming desktop is where it should be
     return Path.home() / "Desktop"
+
+
+if sys.platform == "win32":
+    import winreg as _winreg
+
+    def _get_desktop_path_windows() -> Path:
+        """Resolve the Desktop folder via the Windows Shell Folders registry
+        key, falling back to ~/Desktop when the key is missing.
+        """
+        try:
+            key = _winreg.OpenKey(
+                _winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows"
+                r"\CurrentVersion\Explorer\Shell Folders",
+            )
+            desktop, _ = _winreg.QueryValueEx(key, "Desktop")
+            _winreg.CloseKey(key)
+            return Path(desktop)
+        except OSError:
+            return Path.home() / "Desktop"

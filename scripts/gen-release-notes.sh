@@ -13,9 +13,15 @@ cat <<EOF
 
 ### Install
 
+**Linux**
 \`\`\`bash
 chmod +x git-sentinel
 ./git-sentinel
+\`\`\`
+
+**Windows** - download \`git-sentinel.exe\` and run it from PowerShell or Command Prompt:
+\`\`\`powershell
+.\git-sentinel.exe
 \`\`\`
 
 On first run the binary detects it is not installed and sets itself up automatically.

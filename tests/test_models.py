@@ -8,6 +8,8 @@ import pytest
 from src.models import (
     BranchIssue,
     BranchIssueReason,
+    ConfigEntry,
+    ConfigSection,
     GateHTTP,
     GateSSH,
     MsgFinish,
@@ -266,3 +268,48 @@ class TestMessages:
 
         assert msg.issue_count == 3
         assert msg.report_path == report
+
+
+# ─────────────────────────────────────────────| Config template data models |──
+
+
+class TestConfigEntry:
+    """Tests ConfigEntry dataclass construction and defaults."""
+
+    def test_fields_stored(self) -> None:
+        """label, default, and description are stored exactly as passed."""
+        entry = ConfigEntry("git_root", "git", "Root dir.")
+
+        assert entry.label == "git_root"
+        assert entry.default == "git"
+        assert entry.description == "Root dir."
+
+    def test_enabled_defaults_true(self) -> None:
+        """enabled is True when not specified."""
+        entry = ConfigEntry("k", "v", "d")
+
+        assert entry.enabled is True
+
+    def test_enabled_can_be_set_false(self) -> None:
+        """enabled=False marks the entry as commented-out."""
+        entry = ConfigEntry("k", "v", "d", enabled=False)
+
+        assert entry.enabled is False
+
+
+class TestConfigSection:
+    """Tests ConfigSection dataclass construction."""
+
+    def test_fields_stored(self) -> None:
+        """name and entries are stored exactly as passed."""
+        entries = [ConfigEntry("k", "v", "d")]
+        section = ConfigSection("paths", entries)
+
+        assert section.name == "paths"
+        assert section.entries is entries
+
+    def test_empty_entries(self) -> None:
+        """A section with no entries is valid."""
+        section = ConfigSection("empty", [])
+
+        assert section.entries == []

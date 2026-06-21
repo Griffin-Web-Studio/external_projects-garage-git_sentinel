@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import configparser
+import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.config import get_desktop_path, load_config
+
+windows_only = pytest.mark.skipif(
+    sys.platform != "win32", reason="requires Windows"
+)
 
 # ─────────────────────────────────────────────────────────────| load_config |──
 
@@ -125,7 +130,10 @@ class TestGetDesktopPath:
 
         # empty override must not be returned; function should fall through to
         # XDG/fallback
-        with patch.object(Path, "home", return_value=tmp_path):
+        with (
+            patch.object(Path, "home", return_value=tmp_path),
+            patch("sys.platform", "linux"),
+        ):
             result = get_desktop_path(cfg)
 
         # no XDG file under tmp_path, so falls back to Desktop
@@ -145,7 +153,10 @@ class TestGetDesktopPath:
             'XDG_DESKTOP_DIR="$HOME/XDGDesktop"\n'
         )
 
-        with patch.object(Path, "home", return_value=tmp_path):
+        with (
+            patch.object(Path, "home", return_value=tmp_path),
+            patch("sys.platform", "linux"),
+        ):
             result = get_desktop_path(cfg)
 
         assert result == tmp_path / "XDGDesktop"
@@ -158,7 +169,46 @@ class TestGetDesktopPath:
         """
         cfg = configparser.ConfigParser()
 
-        with patch.object(Path, "home", return_value=tmp_path):
+        with (
+            patch.object(Path, "home", return_value=tmp_path),
+            patch("sys.platform", "linux"),
+        ):
             result = get_desktop_path(cfg)
 
         assert result == tmp_path / "Desktop"
+
+
+# ─────────────────────────────────────────────────────────| Windows (win32) |──
+
+
+@windows_only
+class TestGetDesktopPathWindows:
+    """Tests _get_desktop_path_windows reads the Desktop path from the
+    Windows registry.
+
+    These tests are skipped on Linux (winreg is unavailable) and run only
+    on the Windows CI runner.
+    """
+
+    def test_reads_desktop_path_from_shell_folders(self) -> None:
+        """Returns the path stored in the Shell Folders registry key."""
+        import src.config as _mod
+
+        desktop = r"C:\Users\Alice\Desktop"
+        with patch("src.config._winreg") as mock_reg:
+            mock_reg.OpenKey.return_value = MagicMock()
+            mock_reg.QueryValueEx.return_value = (desktop, 1)
+            result = _mod._get_desktop_path_windows()
+
+        assert result == Path(desktop)
+
+    def test_oserror_falls_back_to_home_desktop(self) -> None:
+        """OSError from a missing or inaccessible key falls back to
+        ~/Desktop."""
+        import src.config as _mod
+
+        with patch("src.config._winreg") as mock_reg:
+            mock_reg.OpenKey.side_effect = OSError
+            result = _mod._get_desktop_path_windows()
+
+        assert result == Path.home() / "Desktop"

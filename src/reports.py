@@ -129,7 +129,7 @@ def load_previous_issue_keys(desktop: Path, archive: Path) -> set[str]:
     if not candidates:
         return set()
     try:
-        return set(candidates[0].read_text().splitlines())
+        return set(candidates[0].read_text(encoding="utf-8").splitlines())
     except OSError:
         return set()
 
