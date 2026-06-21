@@ -366,10 +366,11 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
         desktop.mkdir(parents=True, exist_ok=True)
         report_path = desktop / fname
         report_path.write_text(
-            format_report(results, prev_keys, curr_keys, cfg, now)
+            format_report(results, prev_keys, curr_keys, cfg, now),
+            encoding="utf-8",
         )
         report_path.with_suffix(".issues").write_text(
-            "\n".join(sorted(curr_keys))
+            "\n".join(sorted(curr_keys)), encoding="utf-8"
         )
         app.log(f"Report written -> {report_path}")
     else:
