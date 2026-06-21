@@ -60,7 +60,7 @@ test:
 test:windows:
   stage: test
   tags:
-    - windows
+    - saas-windows-medium-amd64
   before_script:
     - pip install uv --quiet
   script:
