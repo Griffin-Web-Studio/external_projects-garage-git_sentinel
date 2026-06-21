@@ -16,8 +16,9 @@ setup, commit conventions, release process, and CI pipeline.
 
 ## Dev environment
 
-Requires: `uv`, `git`, and a Linux desktop with `python3-tk` available. The
-devcontainer has everything pre-installed and is the easiest way to get started.
+Requires: `uv`, `git`, and Python 3. Linux also requires `python3-tk` for the
+GUI; on Windows and macOS `tkinter` is bundled with Python. The devcontainer
+has everything pre-installed and is the easiest way to get started.
 
 ```bash
 git clone https://gitlab.com/griffin-web-studio/garage/git-sentinel.git
@@ -25,6 +26,8 @@ cd git-sentinel
 ```
 
 Then either open in the devcontainer, or set up manually:
+
+### Linux / macOS
 
 ```bash
 # Install/update dependencies and activate the venv
@@ -35,20 +38,41 @@ pre-commit install
 pre-commit install --hook-type commit-msg
 ```
 
-`scripts/setup.sh` automates the above steps including installing `uv` via
-`pipx` if you don't have it yet.
+`scripts/setup.sh` automates the above steps. If you don't have `uv` yet,
+install it via the [official installer](https://docs.astral.sh/uv/getting-started/installation/)
+or through `pipx install uv`.
+
+### Windows
+
+```powershell
+# Install/update dependencies and activate the venv
+uv sync --group dev
+
+# Install pre-commit hooks (commit linting + mypy + formatters)
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+`scripts/setup.ps1` automates the above steps. If you don't have `uv` yet,
+install it via the [official installer](https://docs.astral.sh/uv/getting-started/installation/)
+(the recommended path on Windows — no `pipx` required).
 
 ## Running tests
 
+**Linux / macOS**
+
 ```bash
-# Run the full test suite
-.venv/bin/pytest -q
+.venv/bin/pytest -q                                        # full test suite
+.venv/bin/pytest --cov=src --cov-report=term-missing -q   # with coverage
+.venv/bin/mypy --strict src/ git-sentinel.py               # type-check
+```
 
-# Run with coverage report
-.venv/bin/pytest --cov=src --cov-report=term-missing -q
+**Windows**
 
-# Type-check all source files
-.venv/bin/mypy --strict src/ git-sentinel.py
+```powershell
+.venv\Scripts\pytest -q
+.venv\Scripts\pytest --cov=src --cov-report=term-missing -q
+.venv\Scripts\mypy --strict src/ git-sentinel.py
 ```
 
 The test suite covers all non-GUI modules (225 tests, ~78 % overall). GUI layout
@@ -152,7 +176,17 @@ changes.
 
 ## Building locally
 
+**Linux / macOS**
+
 ```bash
 bash scripts/build.sh        # produces dist/git-sentinel
 ./dist/git-sentinel --help   # smoke-test the binary
+```
+
+**Windows**
+
+```powershell
+# No build script yet — run PyInstaller directly
+uv run pyinstaller git-sentinel.py --onefile --name git-sentinel
+.\dist\git-sentinel.exe --help
 ```
