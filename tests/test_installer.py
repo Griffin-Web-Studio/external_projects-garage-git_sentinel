@@ -14,20 +14,15 @@ linux_only = pytest.mark.skipif(
 windows_only = pytest.mark.skipif(
     sys.platform != "win32", reason="requires Windows"
 )
+import src.installer as _installer_module
 from src.installer import (
     _ask_purge,
     _current_binary,
-    _install_autostart,
     _install_binary,
     _install_config,
-    _install_icon,
-    _install_launcher,
     _render_desktop,
-    _remove_autostart,
     _remove_binary,
     _remove_config,
-    _remove_icon,
-    _remove_launcher,
     _remove_state,
     _resource,
     install,
@@ -379,6 +374,7 @@ class TestInstallBinary:
 
         assert paths["binary_dst"].exists()
 
+    @linux_only
     def test_sets_executable_permissions(
         self,
         paths: dict[str, Path],
@@ -514,7 +510,7 @@ class TestInstallIcon:
         svg.write_text("<svg/>")
         monkeypatch.setattr("src.installer._resource", lambda _name: svg)
 
-        _install_icon()
+        _installer_module._install_icon()
 
         assert paths["icon_file"].read_text() == "<svg/>"
 
@@ -545,7 +541,7 @@ class TestInstallAutostart:
         monkeypatch.setattr(
             "src.installer._resource", lambda _name: desktop_template
         )
-        _install_autostart()
+        _installer_module._install_autostart()
 
         assert paths["autostart_file"].exists()
 
@@ -568,7 +564,7 @@ class TestInstallAutostart:
         monkeypatch.setattr(
             "src.installer._resource", lambda _name: desktop_template
         )
-        _install_autostart()
+        _installer_module._install_autostart()
 
         assert (
             "X-GNOME-Autostart-enabled=true"
@@ -603,7 +599,7 @@ class TestInstallLauncher:
             "src.installer._resource", lambda _name: desktop_template
         )
 
-        _install_launcher()
+        _installer_module._install_launcher()
 
         assert paths["launcher_file"].exists()
 
@@ -628,7 +624,7 @@ class TestInstallLauncher:
             "src.installer._resource", lambda _name: desktop_template
         )
 
-        _install_launcher()
+        _installer_module._install_launcher()
 
         assert "--force" in paths["launcher_file"].read_text()
 
@@ -704,7 +700,7 @@ class TestRemoveIcon:
         paths["icons_dir"].mkdir(parents=True, exist_ok=True)
         paths["icon_file"].write_text("<svg/>")
 
-        _remove_icon()
+        _installer_module._remove_icon()
 
         assert not paths["icon_file"].exists()
 
@@ -715,7 +711,7 @@ class TestRemoveIcon:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
         """
-        _remove_icon()  # must not raise
+        _installer_module._remove_icon()  # must not raise
 
 
 @linux_only
@@ -732,7 +728,7 @@ class TestRemoveAutostart:
         """
         paths["autostart_dir"].mkdir(parents=True, exist_ok=True)
         paths["autostart_file"].touch()
-        _remove_autostart()
+        _installer_module._remove_autostart()
 
         assert not paths["autostart_file"].exists()
 
@@ -743,7 +739,7 @@ class TestRemoveAutostart:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
         """
-        _remove_autostart()  # must not raise
+        _installer_module._remove_autostart()  # must not raise
 
 
 @linux_only
@@ -760,7 +756,7 @@ class TestRemoveLauncher:
         """
         paths["apps_dir"].mkdir(parents=True, exist_ok=True)
         paths["launcher_file"].touch()
-        _remove_launcher()
+        _installer_module._remove_launcher()
 
         assert not paths["launcher_file"].exists()
 
@@ -771,7 +767,7 @@ class TestRemoveLauncher:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
         """
-        _remove_launcher()  # must not raise
+        _installer_module._remove_launcher()  # must not raise
 
 
 class TestRemoveState:
@@ -831,9 +827,13 @@ class TestInstall:
         with (
             patch("src.installer._install_binary") as mock_binary,
             patch("src.installer._install_config") as mock_config,
-            patch("src.installer._install_icon") as mock_icon,
-            patch("src.installer._install_autostart") as mock_autostart,
-            patch("src.installer._install_launcher") as mock_launcher,
+            patch("src.installer._install_icon", create=True) as mock_icon,
+            patch(
+                "src.installer._install_autostart", create=True
+            ) as mock_autostart,
+            patch(
+                "src.installer._install_launcher", create=True
+            ) as mock_launcher,
         ):
             install(force=True)
 
@@ -864,9 +864,13 @@ class TestInstall:
         with (
             patch("src.installer._install_binary") as mock_binary,
             patch("src.installer._install_config") as mock_config,
-            patch("src.installer._install_icon") as mock_icon,
-            patch("src.installer._install_autostart") as mock_autostart,
-            patch("src.installer._install_launcher") as mock_launcher,
+            patch("src.installer._install_icon", create=True) as mock_icon,
+            patch(
+                "src.installer._install_autostart", create=True
+            ) as mock_autostart,
+            patch(
+                "src.installer._install_launcher", create=True
+            ) as mock_launcher,
         ):
             install(force=True)
 
@@ -892,9 +896,9 @@ class TestInstall:
         with (
             patch("src.installer._install_binary"),
             patch("src.installer._install_config"),
-            patch("src.installer._install_icon"),
-            patch("src.installer._install_autostart"),
-            patch("src.installer._install_launcher"),
+            patch("src.installer._install_icon", create=True),
+            patch("src.installer._install_autostart", create=True),
+            patch("src.installer._install_launcher", create=True),
         ):
             install(force=False)
 
@@ -920,9 +924,9 @@ class TestUninstall:
         monkeypatch.setattr("src.installer._ask_purge", lambda: True)
 
         with (
-            patch("src.installer._remove_autostart"),
-            patch("src.installer._remove_launcher"),
-            patch("src.installer._remove_icon"),
+            patch("src.installer._remove_autostart", create=True),
+            patch("src.installer._remove_launcher", create=True),
+            patch("src.installer._remove_icon", create=True),
             patch("src.installer._remove_config") as mock_config,
             patch("src.installer._remove_state") as mock_state,
             patch("src.installer._remove_binary"),
@@ -944,9 +948,9 @@ class TestUninstall:
         monkeypatch.setattr("src.installer._ask_purge", lambda: False)
 
         with (
-            patch("src.installer._remove_autostart"),
-            patch("src.installer._remove_launcher"),
-            patch("src.installer._remove_icon"),
+            patch("src.installer._remove_autostart", create=True),
+            patch("src.installer._remove_launcher", create=True),
+            patch("src.installer._remove_icon", create=True),
             patch("src.installer._remove_config") as mock_config,
             patch("src.installer._remove_state") as mock_state,
             patch("src.installer._remove_binary"),
@@ -976,9 +980,13 @@ class TestUninstall:
         )
 
         with (
-            patch("src.installer._remove_autostart") as mock_autostart,
-            patch("src.installer._remove_launcher") as mock_launcher,
-            patch("src.installer._remove_icon") as mock_icon,
+            patch(
+                "src.installer._remove_autostart", create=True
+            ) as mock_autostart,
+            patch(
+                "src.installer._remove_launcher", create=True
+            ) as mock_launcher,
+            patch("src.installer._remove_icon", create=True) as mock_icon,
             patch("src.installer._remove_binary"),
         ):
             uninstall()
@@ -989,7 +997,7 @@ class TestUninstall:
         mock_icon.assert_not_called()
 
 
-# ──────────────────────────────────────────────────────────| Windows (win32) |──
+# ─────────────────────────────────────────────────────────| Windows (win32) |──
 
 
 @windows_only
@@ -1040,7 +1048,8 @@ class TestRemoveAutostartWindows:
         assert call_args[1] == APP_NAME
 
     def test_file_not_found_does_not_raise(self) -> None:
-        """FileNotFoundError from a missing Run value is swallowed gracefully."""
+        """FileNotFoundError from a missing Run value is swallowed
+        gracefully."""
         import src.installer as _mod
 
         with patch("src.installer._winreg") as mock_reg:

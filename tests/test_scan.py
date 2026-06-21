@@ -55,8 +55,10 @@ class FakeApp:
 
 @pytest.fixture
 def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Redirect Path.home() to tmp_path via the HOME env var."""
+    """Redirect Path.home() to tmp_path (HOME on Linux, USERPROFILE on
+    Windows)."""
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     return tmp_path
 
 

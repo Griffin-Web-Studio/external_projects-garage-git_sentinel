@@ -130,7 +130,10 @@ class TestGetDesktopPath:
 
         # empty override must not be returned; function should fall through to
         # XDG/fallback
-        with patch.object(Path, "home", return_value=tmp_path):
+        with (
+            patch.object(Path, "home", return_value=tmp_path),
+            patch("sys.platform", "linux"),
+        ):
             result = get_desktop_path(cfg)
 
         # no XDG file under tmp_path, so falls back to Desktop
@@ -150,7 +153,10 @@ class TestGetDesktopPath:
             'XDG_DESKTOP_DIR="$HOME/XDGDesktop"\n'
         )
 
-        with patch.object(Path, "home", return_value=tmp_path):
+        with (
+            patch.object(Path, "home", return_value=tmp_path),
+            patch("sys.platform", "linux"),
+        ):
             result = get_desktop_path(cfg)
 
         assert result == tmp_path / "XDGDesktop"
@@ -163,13 +169,16 @@ class TestGetDesktopPath:
         """
         cfg = configparser.ConfigParser()
 
-        with patch.object(Path, "home", return_value=tmp_path):
+        with (
+            patch.object(Path, "home", return_value=tmp_path),
+            patch("sys.platform", "linux"),
+        ):
             result = get_desktop_path(cfg)
 
         assert result == tmp_path / "Desktop"
 
 
-# ──────────────────────────────────────────────────────────| Windows (win32) |──
+# ─────────────────────────────────────────────────────────| Windows (win32) |──
 
 
 @windows_only
