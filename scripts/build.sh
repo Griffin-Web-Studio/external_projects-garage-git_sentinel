@@ -31,7 +31,6 @@ echo "Building binary (this may take a minute)..."
   --specpath build \
   --add-data "$SCRIPT_DIR/src/data/git-sentinel.desktop:data" \
   --add-data "$SCRIPT_DIR/src/data/git-sentinel.svg:data" \
-  --add-data "$SCRIPT_DIR/src/data/settings.example.ini:data" \
   git-sentinel)
 
 if [ ! -f "$SCRIPT_DIR/dist/git-sentinel" ]; then
