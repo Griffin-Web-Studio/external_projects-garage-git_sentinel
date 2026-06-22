@@ -18,10 +18,6 @@
 # Partially skipped:
 #   test                       → pipeline runs, build stage skipped
 #
-# Manual gate:
-#   MR pipelines and direct pushes to main require a manual trigger.
-#   Schedule and tag pipelines are always automatic.
-#
 # Tag conventions (commitizen semver2 scheme):
 #   v1.2.3             stable release
 #   v1.2.3-alpha.0     alpha pre-release  (cz bump --prerelease alpha)
@@ -49,9 +45,6 @@
 # Commit type filtering (first-match wins; schedule/tag are exempt):
 #   docs, chore, style → pipeline skipped entirely
 #   test               → pipeline runs but build stage is skipped
-#
-# MR and main-branch pipelines require a manual trigger on the test stage;
-# everything downstream waits until you click play.
 workflow:
   auto_cancel:
     on_new_commit: interruptible
@@ -60,12 +53,15 @@ workflow:
     - if: $CI_COMMIT_TAG                               # release tags always run
     - if: $CI_COMMIT_MESSAGE =~ /^(docs|chore|style)(\(.+\))?!?:/
       when: never                                      # skip docs/chore/style
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # MR (manual gate below)
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # pushes to main (manual gate below)
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # MR pipelines only (suppresses branch pipeline)
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # pushes to main
 
 # Mark all jobs interruptible by default; publish/release override this below.
+# Default to the self-hosted Linux runner; Windows jobs override the tag.
 default:
   interruptible: true
+  tags:
+    - linux
 
 stages:
   - test
@@ -77,15 +73,13 @@ variables:
   BINARY:  git-sentinel
   PACKAGE: git-sentinel
 
-# ──────────────────────────────────────────────────────────────────| Test |──
+# ────────────────────────────────────────────────────────────────────| Test |──
 
-# Manual on MR and main; automatic on tags and scheduled pipelines.
+# Runs on every pipeline (MRs, main, tags, scheduled).
 # mypy strict + pytest with a 75% coverage gate.
 test:
   stage: test
   image: python:3.14
-  tags:
-    - linux
   before_script:
     - pip install uv --quiet
   script:
@@ -93,16 +87,10 @@ test:
     - uv run mypy --strict src/ git-sentinel
     - uv run pytest --cov=src --cov-fail-under=75 --cov-report=term-missing -q
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-    - when: always
 
 # Shell executor on a self-hosted Windows runner.
 # Skips linux_only tests; runs windows_only tests that are skipped above.
-# Excluded from scheduled (nightly) pipelines to conserve compute minutes.
+# Excluded from scheduled (nightly) pipelines to conserve runner time.
 test:windows:
   stage: test
   tags:
@@ -117,18 +105,12 @@ test:windows:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
     - when: always
 
 # ───────────────────────────────────────────────────| Shared build template |──
 
 .build:
   stage: build
-  tags:
-    - linux
   image: python:3.14
   before_script:
     - apt-get update -qq && apt-get install -y -qq tk
@@ -164,9 +146,8 @@ build:nightly:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
-# Windows build - shell executor; PyInstaller auto-appends .exe on Windows. Runs
-# only on release tags to conserve Windows runner minutes. test:windows already
-# validates Windows correctness on MRs and main.
+# Windows build - shell executor; PyInstaller auto-appends .exe on Windows.
+# Runs only on release tags.
 build:windows:
   stage: build
   tags:
@@ -181,14 +162,16 @@ build:windows:
       - dist/git-sentinel.exe
     expire_in: 1 week
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_MESSAGE =~ /^test(\(.+\))?!?:/
+      when: never
+    - when: always
 
 # ─────────────────────────────────────────────────| Shared publish template |──
 
 .publish:
   stage: publish
-  tags:
-    - linux
   image: curlimages/curl:latest
   interruptible: false   # never cancel a mid-flight upload
   script:
@@ -230,8 +213,6 @@ publish:nightly:
 
 release:
   stage: release
-  tags:
-    - linux
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   interruptible: false   # never cancel a mid-flight release
   needs: [publish:release, publish:windows:release]
