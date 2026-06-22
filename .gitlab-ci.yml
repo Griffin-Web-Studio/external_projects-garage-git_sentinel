@@ -12,6 +12,16 @@
 #   versioned tag              → test → build (Linux + Windows) → publish → release
 #   scheduled pipeline (main)  → test (Linux only) → build → publish (nightly, rolling)
 #
+# Skipped entirely (commit type filter):
+#   docs, chore, style         → no pipeline created
+#
+# Partially skipped:
+#   test                       → pipeline runs, build stage skipped
+#
+# Manual gate:
+#   MR pipelines and direct pushes to main require a manual trigger.
+#   Schedule and tag pipelines are always automatic.
+#
 # Tag conventions (commitizen semver2 scheme):
 #   v1.2.3             stable release
 #   v1.2.3-alpha.0     alpha pre-release  (cz bump --prerelease alpha)
@@ -35,14 +45,23 @@
 # cancel any running jobs marked interruptible: true (test, build).
 # Publish and release jobs are explicitly marked interruptible: false so
 # they are never cancelled mid-run.
+#
+# Commit type filtering (first-match wins; schedule/tag are exempt):
+#   docs, chore, style → pipeline skipped entirely
+#   test               → pipeline runs but build stage is skipped
+#
+# MR and main-branch pipelines require a manual trigger on the test stage;
+# everything downstream waits until you click play.
 workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # MR pipelines only (suppresses branch pipeline)
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # pushes to main
-    - if: $CI_COMMIT_TAG                               # release tags
-    - if: $CI_PIPELINE_SOURCE == "schedule"            # nightly
+    - if: $CI_PIPELINE_SOURCE == "schedule"            # nightly always runs
+    - if: $CI_COMMIT_TAG                               # release tags always run
+    - if: $CI_COMMIT_MESSAGE =~ /^(docs|chore|style)(\(.+\))?!?:/
+      when: never                                      # skip docs/chore/style
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" # MR (manual gate below)
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH      # pushes to main (manual gate below)
 
 # Mark all jobs interruptible by default; publish/release override this below.
 default:
@@ -60,11 +79,13 @@ variables:
 
 # ──────────────────────────────────────────────────────────────────| Test |──
 
-# Runs on every pipeline (MRs, main, tags, scheduled).
+# Manual on MR and main; automatic on tags and scheduled pipelines.
 # mypy strict + pytest with a 75% coverage gate.
 test:
   stage: test
   image: python:3.14
+  tags:
+    - linux
   before_script:
     - pip install uv --quiet
   script:
@@ -72,14 +93,20 @@ test:
     - uv run mypy --strict src/ git-sentinel
     - uv run pytest --cov=src --cov-fail-under=75 --cov-report=term-missing -q
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+    - when: always
 
-# Shell executor on a GitLab-hosted Windows runner.
+# Shell executor on a self-hosted Windows runner.
 # Skips linux_only tests; runs windows_only tests that are skipped above.
 # Excluded from scheduled (nightly) pipelines to conserve compute minutes.
 test:windows:
   stage: test
   tags:
-    - saas-windows-medium-amd64
+    - windows
   before_script:
     - pip install uv --quiet
   script:
@@ -90,12 +117,18 @@ test:windows:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
     - when: always
 
 # ───────────────────────────────────────────────────| Shared build template |──
 
 .build:
   stage: build
+  tags:
+    - linux
   image: python:3.14
   before_script:
     - apt-get update -qq && apt-get install -y -qq tk
@@ -109,11 +142,14 @@ test:windows:
 
 # ──────────────────────────────────────────────────────────────| Build jobs |──
 
-# Runs on MRs, main, and tags - not on scheduled pipelines (build:nightly handles those).
+# Skipped on scheduled pipelines (build:nightly handles those) and on test:
+# commits (no binary needed when only tests changed).
 build:
   extends: .build
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_MESSAGE =~ /^test(\(.+\))?!?:/
       when: never
     - when: always
 
@@ -134,7 +170,7 @@ build:nightly:
 build:windows:
   stage: build
   tags:
-    - saas-windows-medium-amd64
+    - windows
   before_script:
     - pip install uv --quiet
   script:
@@ -151,6 +187,8 @@ build:windows:
 
 .publish:
   stage: publish
+  tags:
+    - linux
   image: curlimages/curl:latest
   interruptible: false   # never cancel a mid-flight upload
   script:
@@ -192,6 +230,8 @@ publish:nightly:
 
 release:
   stage: release
+  tags:
+    - linux
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   interruptible: false   # never cancel a mid-flight release
   needs: [publish:release, publish:windows:release]
