@@ -68,8 +68,7 @@ def cfg() -> configparser.ConfigParser:
     c = configparser.ConfigParser()
     c["paths"] = {
         "git_root": "git",
-        "reports_archive": "git/reports",
-        "desktop_override": "Desktop",
+        "export_path": "Desktop",
     }
     c["reports"] = {
         "desktop_retention_days": "14",
@@ -643,8 +642,8 @@ class TestScan:
         """On win32 with use_control_master=true, a NOTE is logged and the
         setting is silently forced off for the rest of the scan.
 
-        The cfg fixture supplies a non-empty desktop_override so
-        get_desktop_path() returns early and never touches the Windows registry.
+        The cfg fixture supplies a non-empty export_path so
+        get_export_path() returns early and never touches the Windows registry.
 
         Args:
             fake_home (Path): Temporary HOME; git_root is created inside it.

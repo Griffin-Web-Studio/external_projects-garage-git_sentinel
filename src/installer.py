@@ -150,8 +150,10 @@ def _render_example_config() -> str:
                     ConfigEntry(
                         "reports_archive",
                         "git/reports",
-                        "Directory where reports older than"
-                        " desktop_retention_days are archived.",
+                        "DEPRECATED: no longer used. Reports now live solely"
+                        " in export_path and are deleted after retention_days"
+                        " days. Carry any custom value over to export_path.",
+                        enabled=False,
                     ),
                     ConfigEntry(
                         "export_path",

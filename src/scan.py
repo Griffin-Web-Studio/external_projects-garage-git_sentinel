@@ -365,6 +365,12 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     app.set_progress(90.0)
     app.log("=== Stage 3: Report ===")
 
+    if cfg.has_option("paths", "reports_archive"):
+        app.log(
+            "DEPRECATED: settings.ini uses 'reports_archive' which is no"
+            " longer needed. See the deprecation notice at startup."
+        )
+
     prev_keys = load_previous_issue_keys(desktop)
     curr_keys = collect_issue_keys(results)
     now = datetime.now()

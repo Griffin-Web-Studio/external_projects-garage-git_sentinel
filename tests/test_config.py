@@ -37,7 +37,6 @@ class TestLoadConfig:
         cfg = load_config()
 
         assert cfg.get("paths", "git_root") == "git"
-        assert cfg.get("paths", "reports_archive") == "git/reports"
         assert cfg.get("schedule", "once_per_day") == "true"
         assert cfg.get("ssh", "control_persist_seconds") == "300"
 

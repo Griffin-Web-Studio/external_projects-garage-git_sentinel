@@ -12,7 +12,6 @@ from . import CONFIG_FILE
 _DEFAULTS: dict[str, dict[str, str]] = {
     "paths": {
         "git_root": "git",
-        "reports_archive": "git/reports",
     },
     "reports": {
         "desktop_retention_days": "14",
