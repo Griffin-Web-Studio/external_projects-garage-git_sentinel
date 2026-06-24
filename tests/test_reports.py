@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import configparser
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -266,61 +266,46 @@ class TestLoadPreviousIssueKeys:
 
     def test_no_files_returns_empty_set(self, tmp_path: Path) -> None:
         """Returns an empty set when no .issues files exist."""
-        assert load_previous_issue_keys(tmp_path / "d", tmp_path / "a") == set()
+        assert load_previous_issue_keys(tmp_path / "reports") == set()
 
-    def test_reads_desktop_issues_file(self, tmp_path: Path) -> None:
-        """Reads and splits a .issues file found on the desktop."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        (desktop / "20260101-00-00-00-git-status-report.issues").write_text(
+    def test_reads_issues_file(self, tmp_path: Path) -> None:
+        """Reads and splits the most recent .issues file."""
+        export_path = tmp_path / "reports"
+        export_path.mkdir()
+        (export_path / "20260101-00-00-00-git-status-report.issues").write_text(
             "key1\nkey2"
         )
-        result = load_previous_issue_keys(desktop, tmp_path / "archive")
-        assert result == {"key1", "key2"}
+        assert load_previous_issue_keys(export_path) == {"key1", "key2"}
 
-    def test_reads_archive_issues_file_when_no_desktop_file(
-        self, tmp_path: Path
-    ) -> None:
-        """Falls back to the archive when no desktop .issues file exists."""
-        archive = tmp_path / "archive"
-        archive.mkdir()
-        (archive / "20260101-00-00-00-git-status-report.issues").write_text(
-            "archived_key"
+    def test_picks_latest_by_filename(self, tmp_path: Path) -> None:
+        """When multiple .issues files exist, the lexicographically latest is used."""
+        export_path = tmp_path / "reports"
+        export_path.mkdir()
+        (export_path / "20260610-00-00-00-git-status-report.issues").write_text(
+            "latest_key"
         )
-        result = load_previous_issue_keys(tmp_path / "Desktop", archive)
-        assert result == {"archived_key"}
-
-    def test_desktop_file_takes_precedence_over_archive(
-        self, tmp_path: Path
-    ) -> None:
-        """When both exist, the desktop (latest) file is chosen."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        archive = tmp_path / "archive"
-        archive.mkdir()
-        (desktop / "20260610-00-00-00-git-status-report.issues").write_text(
-            "desktop_key"
+        (export_path / "20260101-00-00-00-git-status-report.issues").write_text(
+            "old_key"
         )
-        (archive / "20260101-00-00-00-git-status-report.issues").write_text(
-            "archive_key"
-        )
-        result = load_previous_issue_keys(desktop, archive)
-        assert "desktop_key" in result
-        assert "archive_key" not in result
+        result = load_previous_issue_keys(export_path)
+        assert "latest_key" in result
+        assert "old_key" not in result
 
     def test_oserror_on_read_returns_empty_set(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """An unreadable .issues file is silently treated as no prior keys."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        (desktop / "20260101-00-00-00-git-status-report.issues").write_text("k")
+        export_path = tmp_path / "reports"
+        export_path.mkdir()
+        (export_path / "20260101-00-00-00-git-status-report.issues").write_text(
+            "k"
+        )
 
         def _boom(self: Path, **kwargs: object) -> str:
             raise OSError("permission denied")
 
         monkeypatch.setattr(Path, "read_text", _boom)
-        assert load_previous_issue_keys(desktop, tmp_path / "archive") == set()
+        assert load_previous_issue_keys(export_path) == set()
 
 
 # ───────────────────────────────────────────────────────────| format_report |──
@@ -467,65 +452,43 @@ class TestFormatReport:
 
 # ──────────────────────────────────────────────────────────| manage_reports |──
 
+_OLD_DATE = "20200101-00-00-00"  # guaranteed > any reasonable retention window
+
 
 class TestManageReports:
-    """Tests for the report rotation and archival function."""
+    """Tests for age-based report cleanup in a single export directory."""
 
-    def test_archive_directory_created_if_missing(self, tmp_path: Path) -> None:
-        """manage_reports creates the archive directory if absent."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        archive = tmp_path / "archive" / "nested"
-        manage_reports(desktop, archive, retention=14, clean_run=False)
-        assert archive.is_dir()
+    def test_export_path_created_if_missing(self, tmp_path: Path) -> None:
+        """manage_reports creates export_path if absent."""
+        export_path = tmp_path / "reports" / "nested"
+        manage_reports(export_path, retention_days=14)
+        assert export_path.is_dir()
 
-    def test_clean_run_moves_all_reports_to_archive(
-        self, tmp_path: Path
-    ) -> None:
-        """On a clean run all desktop .log reports are moved to the archive."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        archive = tmp_path / "archive"
-        _make_report(desktop, "20260101-00-00-00")
-        _make_report(desktop, "20260102-00-00-00")
-        manage_reports(desktop, archive, retention=14, clean_run=True)
-        assert not list(desktop.glob("*.log"))
-        assert len(list(archive.glob("*.log"))) == 2
+    def test_recent_report_kept(self, tmp_path: Path) -> None:
+        """A report dated today is not deleted."""
+        today = date.today().strftime("%Y%m%d")
+        _make_report(tmp_path, f"{today}-00-00-00")
+        manage_reports(tmp_path, retention_days=14)
+        assert len(list(tmp_path.glob("*.log"))) == 1
 
-    def test_clean_run_moves_sidecar_issues_file(self, tmp_path: Path) -> None:
-        """The .issues sidecar is moved alongside its .log report."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        archive = tmp_path / "archive"
-        report = _make_report(desktop, "20260101-00-00-00")
+    def test_old_report_deleted(self, tmp_path: Path) -> None:
+        """A report dated years ago is deleted."""
+        _make_report(tmp_path, _OLD_DATE)
+        manage_reports(tmp_path, retention_days=14)
+        assert not list(tmp_path.glob("*.log"))
+
+    def test_sidecar_deleted_with_log(self, tmp_path: Path) -> None:
+        """The .issues sidecar is deleted alongside its .log report."""
+        report = _make_report(tmp_path, _OLD_DATE)
         sidecar = report.with_suffix(".issues")
         sidecar.write_text("key1")
-        manage_reports(desktop, archive, retention=14, clean_run=True)
+        manage_reports(tmp_path, retention_days=14)
+        assert not report.exists()
         assert not sidecar.exists()
-        assert (archive / sidecar.name).exists()
 
-    def test_issue_run_keeps_reports_within_retention(
-        self, tmp_path: Path
-    ) -> None:
-        """When report count is within retention, nothing is moved."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        archive = tmp_path / "archive"
-        for i in range(3):
-            _make_report(desktop, f"2026010{i + 1}-00-00-00")
-        manage_reports(desktop, archive, retention=3, clean_run=False)
-        assert len(list(desktop.glob("*.log"))) == 3
-        assert not list(archive.glob("*.log"))
-
-    def test_issue_run_moves_oldest_beyond_retention(
-        self, tmp_path: Path
-    ) -> None:
-        """Reports beyond the retention count are moved to the archive."""
-        desktop = tmp_path / "Desktop"
-        desktop.mkdir()
-        archive = tmp_path / "archive"
-        for i in range(5):
-            _make_report(desktop, f"2026010{i + 1}-00-00-00")
-        manage_reports(desktop, archive, retention=3, clean_run=False)
-        assert len(list(desktop.glob("*.log"))) == 3
-        assert len(list(archive.glob("*.log"))) == 2
+    def test_unexpected_filename_skipped(self, tmp_path: Path) -> None:
+        """Files whose names don't start with a parseable date are left alone."""
+        bad = tmp_path / "not-a-date-git-status-report.log"
+        bad.write_text("content")
+        manage_reports(tmp_path, retention_days=0)
+        assert bad.exists()
