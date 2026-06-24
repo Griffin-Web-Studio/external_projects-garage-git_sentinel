@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import configparser
 import sys
+import warnings
 from pathlib import Path
 
 from . import CONFIG_FILE
@@ -66,11 +67,18 @@ def get_export_path(cfg: configparser.ConfigParser) -> Path:
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
 
+    # Deprecated key - kept as a fallback so existing configs still work.
     try:
         override = cfg.get("paths", "desktop_override").strip()
 
         if override:
-            return Path.home() / override  # override exists
+            warnings.warn(
+                "settings.ini: 'desktop_override' is deprecated; rename it to"
+                " 'export_path' to silence this warning.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return Path.home() / override
 
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
