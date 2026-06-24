@@ -91,14 +91,14 @@ All path values are relative to your home directory unless they begin with `/`.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `git_root` | `git` | Root directory scanned recursively for git repositories (`~/git/`) |
-| `reports_archive` | `git/reports` | Where reports older than the retention window are moved (`~/git/reports/`) |
-| `desktop_override` | *(unset)* | Override the Desktop path. Leave unset to use `XDG_DESKTOP_DIR` |
+| `export_path` | *(unset)* | Directory where reports are written. Leave unset to use `XDG_DESKTOP_DIR`. *(Replaces deprecated `desktop_override`)* |
+| ~~`reports_archive`~~ | - | **Deprecated** - no longer used. Carry any custom value over to `export_path`. |
 
 ### `[reports]`
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `desktop_retention_days` | `14` | Maximum number of dated report files kept on the Desktop at one time |
+| `retention_days` | `14` | Number of days to keep report files locally before they are removed. *(Replaces deprecated `desktop_retention_days`)* |
 | `report_extension` | `log` | File extension for report files (`.log` opens well in most editors) |
 
 ### `[staleness]`
@@ -210,10 +210,7 @@ issue keys used to classify findings as new or persistent on the next run.
 
 ### Report retention
 
-- Up to `desktop_retention_days` (default 14) reports are kept on the Desktop.
-- Older reports are moved to `reports_archive` automatically.
-- On a clean run (no issues) all Desktop reports are moved to the archive,
-  leaving the Desktop empty - the visual signal that everything is fine.
+- Reports are written to `export_path` and kept for `retention_days` (default 14) days, after which they are removed.
 
 ## File locations
 
