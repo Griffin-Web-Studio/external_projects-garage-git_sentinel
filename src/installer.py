@@ -154,18 +154,19 @@ def _render_example_config() -> str:
                         " desktop_retention_days are archived.",
                     ),
                     ConfigEntry(
-                        "desktop_override",
+                        "export_path",
                         "Desktop",
-                        "Override the Desktop path where reports are written."
-                        "\n"
+                        "Directory where reports are written. Accepts any path:"
+                        " a Desktop folder, a shared network path, a CI"
+                        " artefact directory, etc.\n"
                         + (
                             "By default git-sentinel reads the Desktop shell"
                             " folder from the Windows registry. Set this only"
-                            " if your Desktop location is non-standard."
+                            " if you want reports in a non-standard location."
                             if win
                             else "By default git-sentinel reads XDG_DESKTOP_DIR"
                             " from ~/.config/user-dirs.dirs. Set this only if"
-                            " your Desktop location is non-standard."
+                            " you want reports in a non-standard location."
                         ),
                         enabled=False,
                     ),
