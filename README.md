@@ -8,7 +8,7 @@
 [![coverage: linux](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test&label=coverage%3A+linux)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test)
 [![coverage: windows](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test%3Awindows&label=coverage%3A+windows)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test%3Awindows)
 
-# Local Git Sentinel
+# Local Git Sentinel (v0.1.0)
 
 Lost work due to a corrupted drive or dead SSD/HDD? Cry no more - the data is
 gone, but you've learned your lesson about not pushing for days on end. Now you
@@ -23,7 +23,7 @@ report is created and any previous reports are moved to an archive.
 
 ## Requirements
 
-- Any Linux desktop (X11 or Wayland)
+- Any Windows, and Linux desktop (X11 or Wayland)
 - `git` in `PATH`
 
 No Python, no system packages. The binary is self-contained.
@@ -31,7 +31,7 @@ No Python, no system packages. The binary is self-contained.
 ## Installation
 
 Download the latest binary from the
-[Releases page](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/releases)
+[Releases page](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/releases/v0.1.0)
 and run it:
 
 ```bash
@@ -163,7 +163,7 @@ Reports are plain-text INI-style files. A typical report looks like:
 [report]
 date              = 2026-06-11
 time              = 08:30:15
-generated_by      = git-sentinel v1.0.0-alpha.1
+generated_by      = git-sentinel v1.1.0
 total_repos       = 8
 repos_with_issues = 2
 repos_passed      = 5

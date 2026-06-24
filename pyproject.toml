@@ -35,7 +35,12 @@ tag_format = "v$version"
 update_changelog_on_bump = true
 changelog_incremental = true
 changelog_merge_prerelease = true
-version_files = ["pyproject.toml:^version", "src/__init__.py:^APP_VERSION"]
+version_files = [
+  "pyproject.toml:^version",
+  "src/__init__.py:^APP_VERSION",
+  "README.md:^# Local Git Sentinel",
+  "README.md:releases/v",
+]
 
 [tool.commitizen.change_type_map]
 feat = "Features"
@@ -47,8 +52,8 @@ refactor = "Refactoring"
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
-    "linux_only: skip on non-Linux platforms",
-    "windows_only: skip on non-Windows platforms",
+  "linux_only: skip on non-Linux platforms",
+  "windows_only: skip on non-Windows platforms",
 ]
 
 [tool.mypy]
