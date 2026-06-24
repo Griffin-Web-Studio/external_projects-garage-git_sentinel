@@ -365,8 +365,7 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     app.set_progress(90.0)
     app.log("=== Stage 3: Report ===")
 
-    archive = home / cfg.get("paths", "reports_archive")
-    prev_keys = load_previous_issue_keys(desktop, archive)
+    prev_keys = load_previous_issue_keys(desktop)
     curr_keys = collect_issue_keys(results)
     now = datetime.now()
     any_issues = bool(curr_keys) or any(r.is_stale for r in results)
@@ -389,7 +388,7 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
         app.log("No issues found - no report generated.")
 
     retention = cfg.getint("reports", "desktop_retention_days")
-    manage_reports(desktop, archive, retention, not any_issues)
+    manage_reports(desktop, retention)
 
     close_ssh_sockets()
 
