@@ -58,6 +58,15 @@ def get_export_path(cfg: configparser.ConfigParser) -> Path:
         Path: location of export dir
     """
     try:
+        override = cfg.get("paths", "export_path").strip()
+
+        if override:
+            return Path.home() / override
+
+    except configparser.NoOptionError, configparser.NoSectionError:
+        pass
+
+    try:
         override = cfg.get("paths", "desktop_override").strip()
 
         if override:
