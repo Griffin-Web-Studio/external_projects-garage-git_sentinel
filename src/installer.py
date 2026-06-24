@@ -178,11 +178,10 @@ def _render_example_config() -> str:
                 "reports",
                 [
                     ConfigEntry(
-                        "desktop_retention_days",
+                        "retention_days",
                         "14",
-                        "Number of dated report files to keep on the Desktop at"
-                        " one time. Once this limit is exceeded the oldest"
-                        " reports are moved to reports_archive.",
+                        "Number of days to keep report files locally."
+                        " Reports older than this are removed.",
                     ),
                     ConfigEntry(
                         "report_extension",

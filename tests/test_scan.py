@@ -71,7 +71,7 @@ def cfg() -> configparser.ConfigParser:
         "export_path": "Desktop",
     }
     c["reports"] = {
-        "desktop_retention_days": "14",
+        "retention_days": "14",
         "report_extension": "log",
     }
     c["staleness"] = {"stale_threshold_days": "90"}

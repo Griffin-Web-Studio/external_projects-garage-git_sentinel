@@ -72,14 +72,15 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE to the
                                               settings.ini in tmp_path.
         """
-        cfg = load_config()
         config_file = tmp_path / "settings.ini"
         config_file.write_text("[paths]\ngit_root = /custom/git\n")
 
         monkeypatch.setattr("src.config.CONFIG_FILE", config_file)
 
-        # default for a different key still present
-        assert cfg.get("paths", "reports_archive") == "git/reports"
+        cfg = load_config()
+
+        # default for a key not touched by the config file still present
+        assert cfg.get("reports", "retention_days") == "14"
 
     def test_returns_config_parser(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -92,11 +93,11 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE into
                                               tmp_path.
         """
-        cfg = load_config()
-
         monkeypatch.setattr(
             "src.config.CONFIG_FILE", tmp_path / "non-existent.ini"
         )
+
+        cfg = load_config()
 
         assert isinstance(cfg, configparser.ConfigParser)
 

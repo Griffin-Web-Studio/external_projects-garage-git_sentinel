@@ -393,7 +393,14 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     else:
         app.log("No issues found - no report generated.")
 
-    retention = cfg.getint("reports", "desktop_retention_days")
+    if cfg.has_option("reports", "desktop_retention_days"):
+        app.log(
+            "DEPRECATED: settings.ini uses 'desktop_retention_days';"
+            " rename it to 'retention_days' to silence this warning."
+        )
+        retention = cfg.getint("reports", "desktop_retention_days")
+    else:
+        retention = cfg.getint("reports", "retention_days")
     manage_reports(desktop, retention)
 
     close_ssh_sockets()

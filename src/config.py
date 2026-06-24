@@ -14,7 +14,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "git_root": "git",
     },
     "reports": {
-        "desktop_retention_days": "14",
+        "retention_days": "14",
         "report_extension": "log",
     },
     "staleness": {

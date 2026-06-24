@@ -35,7 +35,7 @@ def cfg() -> configparser.ConfigParser:
     """Minimal ConfigParser with the sections used by reports."""
     c = configparser.ConfigParser()
     c["staleness"] = {"stale_threshold_days": "90"}
-    c["reports"] = {"report_extension": "log", "desktop_retention_days": "14"}
+    c["reports"] = {"report_extension": "log", "retention_days": "14"}
     return c
 
 
