@@ -139,6 +139,20 @@ class TestGetExportPath:
         # no XDG file under tmp_path, so falls back to Desktop
         assert result == tmp_path / "Desktop"
 
+    def test_deprecated_desktop_override_still_works(self) -> None:
+        """A legacy desktop_override key is honoured but emits DeprecationWarning."""
+        cfg = configparser.ConfigParser()
+        cfg["paths"] = {"desktop_override": "OldDesktop"}
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = get_export_path(cfg)
+
+        assert result == Path.home() / "OldDesktop"
+        assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+
     def test_xdg_user_dirs(self, tmp_path: Path) -> None:
         """XDG_DESKTOP_DIR from user-dirs.dirs is parsed and returned.
 
