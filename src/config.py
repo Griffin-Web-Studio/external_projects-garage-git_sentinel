@@ -48,14 +48,14 @@ def load_config() -> configparser.ConfigParser:
     return cfg
 
 
-def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
-    """Detects user desktop path
+def get_export_path(cfg: configparser.ConfigParser) -> Path:
+    """Resolves the export directory for reports.
 
     Args:
         cfg (configparser.ConfigParser): config parser
 
     Returns:
-        Path: location of desktop dir
+        Path: location of export dir
     """
     try:
         override = cfg.get("paths", "desktop_override").strip()
@@ -67,7 +67,7 @@ def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
         pass
 
     if sys.platform == "win32":
-        return _get_desktop_path_windows()
+        return _get_export_path_windows()
 
     # get xdg user-dirs.dirs file path
     xdg_file = Path.home() / ".config" / "user-dirs.dirs"
@@ -86,7 +86,7 @@ def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
 if sys.platform == "win32":
     import winreg as _winreg
 
-    def _get_desktop_path_windows() -> Path:
+    def _get_export_path_windows() -> Path:
         """Resolve the Desktop folder via the Windows Shell Folders registry
         key, falling back to ~/Desktop when the key is missing.
         """
