@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import APP_NAME, APP_VERSION
-from .config import get_desktop_path
+from .config import get_export_path
 from .git_ops import (
     analyse_branches_and_tags,
     check_local_state,
@@ -283,7 +283,17 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     """
     home = Path.home()
     git_root = home / cfg.get("paths", "git_root")
-    desktop = get_desktop_path(cfg)
+
+    try:
+        if cfg.get("paths", "desktop_override").strip():
+            app.log(
+                "DEPRECATED: settings.ini uses 'desktop_override';"
+                " rename it to 'export_path' to silence this warning."
+            )
+    except configparser.NoOptionError, configparser.NoSectionError:
+        pass
+
+    desktop = get_export_path(cfg)
     persist_s = cfg.getint("ssh", "control_persist_seconds")
     use_cm = cfg.getboolean("ssh", "use_control_master")
     if sys.platform == "win32" and use_cm:
