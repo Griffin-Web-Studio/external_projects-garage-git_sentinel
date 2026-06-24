@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.config import get_desktop_path, load_config
+from src.config import get_export_path, load_config
 
 windows_only = pytest.mark.skipif(
     sys.platform != "win32", reason="requires Windows"
@@ -102,23 +102,23 @@ class TestLoadConfig:
         assert isinstance(cfg, configparser.ConfigParser)
 
 
-# ────────────────────────────────────────────────────────| get_desktop_path |──
+# ─────────────────────────────────────────────────────────| get_export_path |──
 
 
-class TestGetDesktopPath:
-    """Tests that get_desktop_path resolves the user's desktop directory
+class TestGetExportPath:
+    """Tests that get_export_path resolves the report export directory
     correctly."""
 
-    def test_desktop_override_used_when_set(self) -> None:
-        """A desktop_override in config overrides XDG/fallback detection."""
+    def test_export_path_used_when_set(self) -> None:
+        """An export_path in config overrides XDG/fallback detection."""
         cfg = configparser.ConfigParser()
-        cfg["paths"] = {"desktop_override": "MyDesktop"}
-        result = get_desktop_path(cfg)
+        cfg["paths"] = {"export_path": "MyReports"}
+        result = get_export_path(cfg)
 
-        assert result == Path.home() / "MyDesktop"
+        assert result == Path.home() / "MyReports"
 
     def test_empty_override_falls_through(self, tmp_path: Path) -> None:
-        """An empty desktop_override string does not short-circuit; detection
+        """An empty export_path string does not short-circuit; detection
         continues.
 
         Args:
@@ -126,7 +126,7 @@ class TestGetDesktopPath:
                              ensuring the fallback path is reached.
         """
         cfg = configparser.ConfigParser()
-        cfg["paths"] = {"desktop_override": ""}
+        cfg["paths"] = {"export_path": ""}
 
         # empty override must not be returned; function should fall through to
         # XDG/fallback
@@ -134,7 +134,7 @@ class TestGetDesktopPath:
             patch.object(Path, "home", return_value=tmp_path),
             patch("sys.platform", "linux"),
         ):
-            result = get_desktop_path(cfg)
+            result = get_export_path(cfg)
 
         # no XDG file under tmp_path, so falls back to Desktop
         assert result == tmp_path / "Desktop"
@@ -157,7 +157,7 @@ class TestGetDesktopPath:
             patch.object(Path, "home", return_value=tmp_path),
             patch("sys.platform", "linux"),
         ):
-            result = get_desktop_path(cfg)
+            result = get_export_path(cfg)
 
         assert result == tmp_path / "XDGDesktop"
 
@@ -173,7 +173,7 @@ class TestGetDesktopPath:
             patch.object(Path, "home", return_value=tmp_path),
             patch("sys.platform", "linux"),
         ):
-            result = get_desktop_path(cfg)
+            result = get_export_path(cfg)
 
         assert result == tmp_path / "Desktop"
 
@@ -182,9 +182,9 @@ class TestGetDesktopPath:
 
 
 @windows_only
-class TestGetDesktopPathWindows:
-    """Tests _get_desktop_path_windows reads the Desktop path from the
-    Windows registry.
+class TestGetExportPathWindows:
+    """Tests _get_export_path_windows reads the default export path from the
+    Windows registry (Shell Folders → Desktop).
 
     These tests are skipped on Linux (winreg is unavailable) and run only
     on the Windows CI runner.
@@ -198,7 +198,7 @@ class TestGetDesktopPathWindows:
         with patch("src.config._winreg") as mock_reg:
             mock_reg.OpenKey.return_value = MagicMock()
             mock_reg.QueryValueEx.return_value = (desktop, 1)
-            result = _mod._get_desktop_path_windows()
+            result = _mod._get_export_path_windows()
 
         assert result == Path(desktop)
 
@@ -209,6 +209,6 @@ class TestGetDesktopPathWindows:
 
         with patch("src.config._winreg") as mock_reg:
             mock_reg.OpenKey.side_effect = OSError
-            result = _mod._get_desktop_path_windows()
+            result = _mod._get_export_path_windows()
 
         assert result == Path.home() / "Desktop"
