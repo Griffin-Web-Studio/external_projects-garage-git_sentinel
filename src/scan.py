@@ -293,7 +293,7 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
 
-    desktop = get_export_path(cfg)
+    export_path = get_export_path(cfg)
     persist_s = cfg.getint("ssh", "control_persist_seconds")
     use_cm = cfg.getboolean("ssh", "use_control_master")
     if sys.platform == "win32" and use_cm:
@@ -305,8 +305,8 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     stale_days = cfg.getint("staleness", "stale_threshold_days")
 
     app.log(f"{APP_NAME}  v{APP_VERSION}")
-    app.log(f"Scan root : {git_root}")
-    app.log(f"Desktop   : {desktop}")
+    app.log(f"Scan root     : {git_root}")
+    app.log(f"Reports Path  : {export_path}")
     app.log("")
 
     # ── Stage 1: Discovery ────────────────────────────────────────────────────
@@ -371,7 +371,7 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
             " longer needed. See the deprecation notice at startup."
         )
 
-    prev_keys = load_previous_issue_keys(desktop)
+    prev_keys = load_previous_issue_keys(export_path)
     curr_keys = collect_issue_keys(results)
     now = datetime.now()
     any_issues = bool(curr_keys) or any(r.is_stale for r in results)
@@ -380,8 +380,8 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     if any_issues:
         ext = cfg.get("reports", "report_extension")
         fname = now.strftime(f"%Y%m%d-%H-%M-%S-git-status-report.{ext}")
-        desktop.mkdir(parents=True, exist_ok=True)
-        report_path = desktop / fname
+        export_path.mkdir(parents=True, exist_ok=True)
+        report_path = export_path / fname
         report_path.write_text(
             format_report(results, prev_keys, curr_keys, cfg, now),
             encoding="utf-8",
@@ -401,7 +401,7 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
         retention = cfg.getint("reports", "desktop_retention_days")
     else:
         retention = cfg.getint("reports", "retention_days")
-    manage_reports(desktop, retention)
+    manage_reports(export_path, retention)
 
     close_ssh_sockets()
 
