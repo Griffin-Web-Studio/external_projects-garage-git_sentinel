@@ -1,3 +1,28 @@
+## v0.2.0 (2026-06-25)
+
+### Bug Fixes
+
+- **scan.py**: correct missed arguments
+
+### Features
+
+- **migrations**: ensure old reports on desktop are moved to export path
+- **gui/app**: implement a config migration dialog and migrations
+- **migrations**: implement first migration
+- **configmigrate**: create a config migrator
+- **config**: add new export_path setting key
+- **config**: rename desktop path to export path functions
+
+### Refactoring
+
+- **installer**: remove reports_archive since it's deprecated
+- drop desktop_ prefix from desktop_retention_days
+- remove report_archive
+- **reports**: remove archive, and keep new export_path
+- **scan**: correct function name imports
+- **installer**: replace desktop_override setting with export_path
+- **config**: add desktop_override deprivation warning
+
 ## v0.1.0 (2026-06-21)
 
 ### Bug Fixes
