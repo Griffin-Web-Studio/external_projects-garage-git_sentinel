@@ -48,7 +48,8 @@
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
         "files.exclude": {
-          "**/__pycache__": true
+          "**/__pycache__": true,
+          ".*_cache": true
         },
         "files.insertFinalNewline": true,
         "editor.formatOnPaste": true,
