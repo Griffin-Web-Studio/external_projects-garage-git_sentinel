@@ -48,8 +48,14 @@
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
         "files.exclude": {
-          "**/__pycache__": true,
-          ".*_cache": true
+          // Files listed below should be ignored through .gitignore, and
+          // shouldn't be expected to be editable by a developer
+          ".claude-sessions/": true,
+          ".*_cache": true,
+          ".venv": true,
+          ".coverage": true,
+          "build": true, // optional, could be useful but rarely
+          "**/__pycache__": true
         },
         "files.insertFinalNewline": true,
         "editor.formatOnPaste": true,
