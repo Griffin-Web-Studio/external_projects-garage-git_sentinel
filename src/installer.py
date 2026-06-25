@@ -148,16 +148,8 @@ def _render_example_config() -> str:
                         " repositories.",
                     ),
                     ConfigEntry(
-                        "reports_archive",
-                        "git/reports",
-                        "DEPRECATED: no longer used. Reports now live solely"
-                        " in export_path and are deleted after retention_days"
-                        " days. Carry any custom value over to export_path.",
-                        enabled=False,
-                    ),
-                    ConfigEntry(
                         "export_path",
-                        "Desktop",
+                        "git/reports",
                         "Directory where reports are written. Accepts any path:"
                         " a Desktop folder, a shared network path, a CI"
                         " artefact directory, etc.\n"
