@@ -6,6 +6,7 @@ from pathlib import Path
 import tkinter as tk
 
 from .. import APP_NAME, APP_VERSION
+from ..migrations import apply_migrations, chain, make_adapter
 from ..models import (
     GateHTTP,
     GateSSH,
@@ -14,6 +15,7 @@ from ..models import (
     MsgProgress,
     MsgStatus,
 )
+from .migration_dialog import show_migration_dialog
 from .prompts import PromptArea
 from .window import MainWindow
 
@@ -66,6 +68,14 @@ class GitSentinelApp(tk.Tk):
         # kick off the polling loops; each reschedules itself indefinitely
         self.after(80, self._drain_ui_queue)
         self.after(80, self._check_gate_queue)
+
+        pending = chain.pending(make_adapter())
+        if pending:
+
+            def _show_migration() -> None:
+                show_migration_dialog(self, pending, apply_migrations)
+
+            self.after(0, _show_migration)
 
     # ── Queue drains (main thread) ────────────────────────────────────────────
 

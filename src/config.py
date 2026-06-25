@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import configparser
 import sys
+import warnings
 from pathlib import Path
 
 from . import CONFIG_FILE
@@ -11,10 +12,9 @@ from . import CONFIG_FILE
 _DEFAULTS: dict[str, dict[str, str]] = {
     "paths": {
         "git_root": "git",
-        "reports_archive": "git/reports",
     },
     "reports": {
-        "desktop_retention_days": "14",
+        "retention_days": "14",
         "report_extension": "log",
     },
     "staleness": {
@@ -48,26 +48,42 @@ def load_config() -> configparser.ConfigParser:
     return cfg
 
 
-def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
-    """Detects user desktop path
+def get_export_path(cfg: configparser.ConfigParser) -> Path:
+    """Resolves the export directory for reports.
 
     Args:
         cfg (configparser.ConfigParser): config parser
 
     Returns:
-        Path: location of desktop dir
+        Path: location of export dir
     """
+    try:
+        override = cfg.get("paths", "export_path").strip()
+
+        if override:
+            return Path.home() / override
+
+    except configparser.NoOptionError, configparser.NoSectionError:
+        pass
+
+    # Deprecated key - kept as a fallback so existing configs still work.
     try:
         override = cfg.get("paths", "desktop_override").strip()
 
         if override:
-            return Path.home() / override  # override exists
+            warnings.warn(
+                "settings.ini: 'desktop_override' is deprecated; rename it to"
+                " 'export_path' to silence this warning.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return Path.home() / override
 
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
 
     if sys.platform == "win32":
-        return _get_desktop_path_windows()
+        return _get_export_path_windows()
 
     # get xdg user-dirs.dirs file path
     xdg_file = Path.home() / ".config" / "user-dirs.dirs"
@@ -86,7 +102,7 @@ def get_desktop_path(cfg: configparser.ConfigParser) -> Path:
 if sys.platform == "win32":
     import winreg as _winreg
 
-    def _get_desktop_path_windows() -> Path:
+    def _get_export_path_windows() -> Path:
         """Resolve the Desktop folder via the Windows Shell Folders registry
         key, falling back to ~/Desktop when the key is missing.
         """

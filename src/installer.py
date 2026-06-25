@@ -148,25 +148,12 @@ def _render_example_config() -> str:
                         " repositories.",
                     ),
                     ConfigEntry(
-                        "reports_archive",
+                        "export_path",
                         "git/reports",
-                        "Directory where reports older than"
-                        " desktop_retention_days are archived.",
-                    ),
-                    ConfigEntry(
-                        "desktop_override",
-                        "Desktop",
-                        "Override the Desktop path where reports are written."
-                        "\n"
-                        + (
-                            "By default git-sentinel reads the Desktop shell"
-                            " folder from the Windows registry. Set this only"
-                            " if your Desktop location is non-standard."
-                            if win
-                            else "By default git-sentinel reads XDG_DESKTOP_DIR"
-                            " from ~/.config/user-dirs.dirs. Set this only if"
-                            " your Desktop location is non-standard."
-                        ),
+                        "Directory where reports are written. Accepts any path:"
+                        " a Desktop folder, a shared network path, a CI"
+                        " artefact directory, etc.\n By default git-sentinel "
+                        "will store the file inside the git/reports dir.",
                         enabled=False,
                     ),
                 ],
@@ -175,11 +162,10 @@ def _render_example_config() -> str:
                 "reports",
                 [
                     ConfigEntry(
-                        "desktop_retention_days",
+                        "retention_days",
                         "14",
-                        "Number of dated report files to keep on the Desktop at"
-                        " one time. Once this limit is exceeded the oldest"
-                        " reports are moved to reports_archive.",
+                        "Number of days to keep report files locally."
+                        " Reports older than this are removed.",
                     ),
                     ConfigEntry(
                         "report_extension",

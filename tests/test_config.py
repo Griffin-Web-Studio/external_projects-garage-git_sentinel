@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.config import get_desktop_path, load_config
+from src.config import get_export_path, load_config
 
 windows_only = pytest.mark.skipif(
     sys.platform != "win32", reason="requires Windows"
@@ -37,7 +37,6 @@ class TestLoadConfig:
         cfg = load_config()
 
         assert cfg.get("paths", "git_root") == "git"
-        assert cfg.get("paths", "reports_archive") == "git/reports"
         assert cfg.get("schedule", "once_per_day") == "true"
         assert cfg.get("ssh", "control_persist_seconds") == "300"
 
@@ -73,14 +72,15 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE to the
                                               settings.ini in tmp_path.
         """
-        cfg = load_config()
         config_file = tmp_path / "settings.ini"
         config_file.write_text("[paths]\ngit_root = /custom/git\n")
 
         monkeypatch.setattr("src.config.CONFIG_FILE", config_file)
 
-        # default for a different key still present
-        assert cfg.get("paths", "reports_archive") == "git/reports"
+        cfg = load_config()
+
+        # default for a key not touched by the config file still present
+        assert cfg.get("reports", "retention_days") == "14"
 
     def test_returns_config_parser(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -93,32 +93,32 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE into
                                               tmp_path.
         """
-        cfg = load_config()
-
         monkeypatch.setattr(
             "src.config.CONFIG_FILE", tmp_path / "non-existent.ini"
         )
 
+        cfg = load_config()
+
         assert isinstance(cfg, configparser.ConfigParser)
 
 
-# ────────────────────────────────────────────────────────| get_desktop_path |──
+# ─────────────────────────────────────────────────────────| get_export_path |──
 
 
-class TestGetDesktopPath:
-    """Tests that get_desktop_path resolves the user's desktop directory
+class TestGetExportPath:
+    """Tests that get_export_path resolves the report export directory
     correctly."""
 
-    def test_desktop_override_used_when_set(self) -> None:
-        """A desktop_override in config overrides XDG/fallback detection."""
+    def test_export_path_used_when_set(self) -> None:
+        """An export_path in config overrides XDG/fallback detection."""
         cfg = configparser.ConfigParser()
-        cfg["paths"] = {"desktop_override": "MyDesktop"}
-        result = get_desktop_path(cfg)
+        cfg["paths"] = {"export_path": "MyReports"}
+        result = get_export_path(cfg)
 
-        assert result == Path.home() / "MyDesktop"
+        assert result == Path.home() / "MyReports"
 
     def test_empty_override_falls_through(self, tmp_path: Path) -> None:
-        """An empty desktop_override string does not short-circuit; detection
+        """An empty export_path string does not short-circuit; detection
         continues.
 
         Args:
@@ -126,7 +126,7 @@ class TestGetDesktopPath:
                              ensuring the fallback path is reached.
         """
         cfg = configparser.ConfigParser()
-        cfg["paths"] = {"desktop_override": ""}
+        cfg["paths"] = {"export_path": ""}
 
         # empty override must not be returned; function should fall through to
         # XDG/fallback
@@ -134,10 +134,24 @@ class TestGetDesktopPath:
             patch.object(Path, "home", return_value=tmp_path),
             patch("sys.platform", "linux"),
         ):
-            result = get_desktop_path(cfg)
+            result = get_export_path(cfg)
 
         # no XDG file under tmp_path, so falls back to Desktop
         assert result == tmp_path / "Desktop"
+
+    def test_deprecated_desktop_override_still_works(self) -> None:
+        """A legacy desktop_override key is honoured but emits DeprecationWarning."""
+        cfg = configparser.ConfigParser()
+        cfg["paths"] = {"desktop_override": "OldDesktop"}
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = get_export_path(cfg)
+
+        assert result == Path.home() / "OldDesktop"
+        assert any(issubclass(w.category, DeprecationWarning) for w in caught)
 
     def test_xdg_user_dirs(self, tmp_path: Path) -> None:
         """XDG_DESKTOP_DIR from user-dirs.dirs is parsed and returned.
@@ -157,7 +171,7 @@ class TestGetDesktopPath:
             patch.object(Path, "home", return_value=tmp_path),
             patch("sys.platform", "linux"),
         ):
-            result = get_desktop_path(cfg)
+            result = get_export_path(cfg)
 
         assert result == tmp_path / "XDGDesktop"
 
@@ -173,7 +187,7 @@ class TestGetDesktopPath:
             patch.object(Path, "home", return_value=tmp_path),
             patch("sys.platform", "linux"),
         ):
-            result = get_desktop_path(cfg)
+            result = get_export_path(cfg)
 
         assert result == tmp_path / "Desktop"
 
@@ -182,9 +196,9 @@ class TestGetDesktopPath:
 
 
 @windows_only
-class TestGetDesktopPathWindows:
-    """Tests _get_desktop_path_windows reads the Desktop path from the
-    Windows registry.
+class TestGetExportPathWindows:
+    """Tests _get_export_path_windows reads the default export path from the
+    Windows registry (Shell Folders → Desktop).
 
     These tests are skipped on Linux (winreg is unavailable) and run only
     on the Windows CI runner.
@@ -198,7 +212,7 @@ class TestGetDesktopPathWindows:
         with patch("src.config._winreg") as mock_reg:
             mock_reg.OpenKey.return_value = MagicMock()
             mock_reg.QueryValueEx.return_value = (desktop, 1)
-            result = _mod._get_desktop_path_windows()
+            result = _mod._get_export_path_windows()
 
         assert result == Path(desktop)
 
@@ -209,6 +223,6 @@ class TestGetDesktopPathWindows:
 
         with patch("src.config._winreg") as mock_reg:
             mock_reg.OpenKey.side_effect = OSError
-            result = _mod._get_desktop_path_windows()
+            result = _mod._get_export_path_windows()
 
         assert result == Path.home() / "Desktop"

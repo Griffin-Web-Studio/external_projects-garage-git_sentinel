@@ -8,7 +8,7 @@
 [![coverage: linux](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test&label=coverage%3A+linux)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test)
 [![coverage: windows](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test%3Awindows&label=coverage%3A+windows)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test%3Awindows)
 
-# Local Git Sentinel
+# Local Git Sentinel (v0.1.0)
 
 Lost work due to a corrupted drive or dead SSD/HDD? Cry no more - the data is
 gone, but you've learned your lesson about not pushing for days on end. Now you
@@ -23,7 +23,7 @@ report is created and any previous reports are moved to an archive.
 
 ## Requirements
 
-- Any Linux desktop (X11 or Wayland)
+- Any Windows, and Linux desktop (X11 or Wayland)
 - `git` in `PATH`
 
 No Python, no system packages. The binary is self-contained.
@@ -31,7 +31,7 @@ No Python, no system packages. The binary is self-contained.
 ## Installation
 
 Download the latest binary from the
-[Releases page](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/releases)
+[Releases page](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/releases/v0.1.0)
 and run it:
 
 ```bash
@@ -91,14 +91,14 @@ All path values are relative to your home directory unless they begin with `/`.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `git_root` | `git` | Root directory scanned recursively for git repositories (`~/git/`) |
-| `reports_archive` | `git/reports` | Where reports older than the retention window are moved (`~/git/reports/`) |
-| `desktop_override` | *(unset)* | Override the Desktop path. Leave unset to use `XDG_DESKTOP_DIR` |
+| `export_path` | *(unset)* | Directory where reports are written. Leave unset to use `XDG_DESKTOP_DIR`. *(Replaces deprecated `desktop_override`)* |
+| ~~`reports_archive`~~ | - | **Deprecated** - no longer used. Carry any custom value over to `export_path`. |
 
 ### `[reports]`
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `desktop_retention_days` | `14` | Maximum number of dated report files kept on the Desktop at one time |
+| `retention_days` | `14` | Number of days to keep report files locally before they are removed. *(Replaces deprecated `desktop_retention_days`)* |
 | `report_extension` | `log` | File extension for report files (`.log` opens well in most editors) |
 
 ### `[staleness]`
@@ -163,7 +163,7 @@ Reports are plain-text INI-style files. A typical report looks like:
 [report]
 date              = 2026-06-11
 time              = 08:30:15
-generated_by      = git-sentinel v1.0.0-alpha.1
+generated_by      = git-sentinel v1.1.0
 total_repos       = 8
 repos_with_issues = 2
 repos_passed      = 5
@@ -210,10 +210,7 @@ issue keys used to classify findings as new or persistent on the next run.
 
 ### Report retention
 
-- Up to `desktop_retention_days` (default 14) reports are kept on the Desktop.
-- Older reports are moved to `reports_archive` automatically.
-- On a clean run (no issues) all Desktop reports are moved to the archive,
-  leaving the Desktop empty - the visual signal that everything is fine.
+- Reports are written to `export_path` and kept for `retention_days` (default 14) days, after which they are removed.
 
 ## File locations
 

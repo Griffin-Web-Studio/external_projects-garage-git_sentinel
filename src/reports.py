@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import configparser
-import shutil
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import APP_NAME, APP_VERSION
@@ -108,24 +107,19 @@ def collect_issue_keys(results: list[RepoResult]) -> set[str]:
     return keys
 
 
-def load_previous_issue_keys(desktop: Path, archive: Path) -> set[str]:
+def load_previous_issue_keys(export_path: Path) -> set[str]:
     """Return issue keys from the most recent previous report, if any.
 
-    Searches the desktop first, then the archive, taking the
-    lexicographically latest .issues sidecar file.
-
     Args:
-        desktop (Path): Desktop directory where live reports are written.
-        archive (Path): Archive directory where old reports are moved.
+        export_path (Path): Directory where reports are written.
 
     Returns:
         set[str]: Issue keys from the previous run, or an empty set if no
             prior report exists or the file cannot be read.
     """
-    candidates = [
-        *sorted(desktop.glob("*-git-status-report.issues"), reverse=True),
-        *sorted(archive.glob("*-git-status-report.issues"), reverse=True),
-    ]
+    candidates = sorted(
+        export_path.glob("*-git-status-report.issues"), reverse=True
+    )
     if not candidates:
         return set()
     try:
@@ -305,39 +299,28 @@ def format_report(
     return "\n".join(L)
 
 
-def manage_reports(
-    desktop: Path,
-    archive: Path,
-    retention: int,
-    clean_run: bool,
-) -> None:
-    """Move old report files between the desktop and the archive directory.
+def manage_reports(export_path: Path, retention_days: int) -> None:
+    """Delete report files older than retention_days from export_path.
 
-    On a clean run (no issues), all live reports on the desktop are moved
-    to the archive. Otherwise, only reports beyond the retention window are
-    moved, keeping the most recent *retention* reports on the desktop.
+    The report date is read from the filename prefix (YYYYMMDD). Both the
+    .log report and its .issues sidecar are removed together.
 
     Args:
-        desktop (Path): Desktop directory where live reports are written.
-        archive (Path): Archive directory; created if it does not exist.
-        retention (int): Maximum number of report files to keep on the
-            desktop. Older ones are moved to the archive.
-        clean_run (bool): True if no issues were found this run.
+        export_path (Path): Directory where reports are written.
+        retention_days (int): Reports older than this many days are deleted.
     """
-    archive.mkdir(parents=True, exist_ok=True)
+    export_path.mkdir(parents=True, exist_ok=True)
+    cutoff = date.today() - timedelta(days=retention_days)
 
-    def _move(src: Path) -> None:
-        shutil.move(str(src), archive / src.name)
-        sidecar = src.with_suffix(".issues")
-        if sidecar.exists():
-            shutil.move(str(sidecar), archive / sidecar.name)
-
-    if clean_run:
-        for f in desktop.glob("*-git-status-report.log"):
-            _move(f)
-        return
-
-    for old in sorted(desktop.glob("*-git-status-report.log"), reverse=True)[
-        retention:
-    ]:
-        _move(old)
+    for report in export_path.glob("*-git-status-report.log"):
+        try:
+            report_date = date(
+                int(report.name[:4]),
+                int(report.name[4:6]),
+                int(report.name[6:8]),
+            )
+        except ValueError:
+            continue
+        if report_date < cutoff:
+            report.unlink(missing_ok=True)
+            report.with_suffix(".issues").unlink(missing_ok=True)

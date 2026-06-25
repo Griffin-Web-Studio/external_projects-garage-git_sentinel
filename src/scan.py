@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import APP_NAME, APP_VERSION
-from .config import get_desktop_path
+from .config import get_export_path
 from .git_ops import (
     analyse_branches_and_tags,
     check_local_state,
@@ -283,7 +283,17 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     """
     home = Path.home()
     git_root = home / cfg.get("paths", "git_root")
-    desktop = get_desktop_path(cfg)
+
+    try:
+        if cfg.get("paths", "desktop_override").strip():
+            app.log(
+                "DEPRECATED: settings.ini uses 'desktop_override';"
+                " rename it to 'export_path' to silence this warning."
+            )
+    except configparser.NoOptionError, configparser.NoSectionError:
+        pass
+
+    export_path = get_export_path(cfg)
     persist_s = cfg.getint("ssh", "control_persist_seconds")
     use_cm = cfg.getboolean("ssh", "use_control_master")
     if sys.platform == "win32" and use_cm:
@@ -295,8 +305,8 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     stale_days = cfg.getint("staleness", "stale_threshold_days")
 
     app.log(f"{APP_NAME}  v{APP_VERSION}")
-    app.log(f"Scan root : {git_root}")
-    app.log(f"Desktop   : {desktop}")
+    app.log(f"Scan root     : {git_root}")
+    app.log(f"Reports Path  : {export_path}")
     app.log("")
 
     # ── Stage 1: Discovery ────────────────────────────────────────────────────
@@ -355,8 +365,13 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     app.set_progress(90.0)
     app.log("=== Stage 3: Report ===")
 
-    archive = home / cfg.get("paths", "reports_archive")
-    prev_keys = load_previous_issue_keys(desktop, archive)
+    if cfg.has_option("paths", "reports_archive"):
+        app.log(
+            "DEPRECATED: settings.ini uses 'reports_archive' which is no"
+            " longer needed. See the deprecation notice at startup."
+        )
+
+    prev_keys = load_previous_issue_keys(export_path)
     curr_keys = collect_issue_keys(results)
     now = datetime.now()
     any_issues = bool(curr_keys) or any(r.is_stale for r in results)
@@ -365,8 +380,8 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     if any_issues:
         ext = cfg.get("reports", "report_extension")
         fname = now.strftime(f"%Y%m%d-%H-%M-%S-git-status-report.{ext}")
-        desktop.mkdir(parents=True, exist_ok=True)
-        report_path = desktop / fname
+        export_path.mkdir(parents=True, exist_ok=True)
+        report_path = export_path / fname
         report_path.write_text(
             format_report(results, prev_keys, curr_keys, cfg, now),
             encoding="utf-8",
@@ -378,8 +393,15 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     else:
         app.log("No issues found - no report generated.")
 
-    retention = cfg.getint("reports", "desktop_retention_days")
-    manage_reports(desktop, archive, retention, not any_issues)
+    if cfg.has_option("reports", "desktop_retention_days"):
+        app.log(
+            "DEPRECATED: settings.ini uses 'desktop_retention_days';"
+            " rename it to 'retention_days' to silence this warning."
+        )
+        retention = cfg.getint("reports", "desktop_retention_days")
+    else:
+        retention = cfg.getint("reports", "retention_days")
+    manage_reports(export_path, retention)
 
     close_ssh_sockets()
 
