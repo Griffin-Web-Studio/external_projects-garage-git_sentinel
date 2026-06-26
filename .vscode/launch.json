@@ -8,8 +8,9 @@
       "name": "Sentinel Debugger: normal run",
       "type": "debugpy",
       "request": "launch",
-      "args": [],
-      "django": true,
+      "args": [
+        "--force"
+      ],
       "autoStartBrowser": false,
       "program": "${workspaceFolder}/git-sentinel"
     },
