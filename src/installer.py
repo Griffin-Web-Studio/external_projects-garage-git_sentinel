@@ -154,7 +154,7 @@ def _render_example_config() -> str:
                         " a Desktop folder, a shared network path, a CI"
                         " artefact directory, etc.\n By default git-sentinel "
                         "will store the file inside the git/reports dir.",
-                        enabled=False,
+                        enabled=True,
                     ),
                 ],
             ),
