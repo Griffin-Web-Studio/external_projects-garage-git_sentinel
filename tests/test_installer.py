@@ -67,7 +67,7 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     """Redirect all installer module-level path constants into tmp_path."""
     bin_dir = tmp_path / "bin"
     binary_dst = bin_dir / APP_NAME
-    config_dir = tmp_path / "config"
+    CONF_DIR = tmp_path / "config"
     state_dir = tmp_path / "state"
     autostart_dir = tmp_path / "autostart"
     autostart_file = autostart_dir / f"{APP_NAME}.desktop"
@@ -83,7 +83,7 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
 
     monkeypatch.setattr("src.installer.BIN_DIR", bin_dir)
     monkeypatch.setattr("src.installer.BINARY_DST", binary_dst)
-    monkeypatch.setattr("src.installer.CONFIG_DIR", config_dir)
+    monkeypatch.setattr("src.installer.CONF_DIR", CONF_DIR)
     monkeypatch.setattr("src.installer.STATE_DIR", state_dir)
     # Linux-only constants: silently skip on Windows where they don't exist.
     monkeypatch.setattr(
@@ -117,7 +117,7 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     return {
         "bin_dir": bin_dir,
         "binary_dst": binary_dst,
-        "config_dir": config_dir,
+        "CONF_DIR": CONF_DIR,
         "state_dir": state_dir,
         "autostart_dir": autostart_dir,
         "autostart_file": autostart_file,
@@ -447,7 +447,7 @@ class TestInstallConfig:
     """Tests _install_config generates and deploys config files correctly."""
 
     def test_writes_example_file(self, paths: dict[str, Path]) -> None:
-        """settings.example.ini is always written to CONFIG_DIR.
+        """settings.example.ini is always written to CONF_DIR.
 
         Args:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
@@ -455,7 +455,7 @@ class TestInstallConfig:
         """
         _install_config()
 
-        assert (paths["config_dir"] / "settings.example.ini").exists()
+        assert (paths["CONF_DIR"] / "settings.example.ini").exists()
 
     def test_example_file_contains_expected_sections(
         self, paths: dict[str, Path]
@@ -468,7 +468,7 @@ class TestInstallConfig:
         """
         _install_config()
 
-        content = (paths["config_dir"] / "settings.example.ini").read_text()
+        content = (paths["CONF_DIR"] / "settings.example.ini").read_text()
         for section in (
             "[paths]",
             "[reports]",
@@ -487,7 +487,7 @@ class TestInstallConfig:
         """
         _install_config()
 
-        assert (paths["config_dir"] / "settings.ini").exists()
+        assert (paths["CONF_DIR"] / "settings.ini").exists()
 
     def test_leaves_existing_config_intact(
         self, paths: dict[str, Path]
@@ -498,8 +498,8 @@ class TestInstallConfig:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
         """
-        config = paths["config_dir"] / "settings.ini"
-        paths["config_dir"].mkdir(parents=True, exist_ok=True)
+        config = paths["CONF_DIR"] / "settings.ini"
+        paths["CONF_DIR"].mkdir(parents=True, exist_ok=True)
         config.write_text("[paths]\ngit_root = custom\n")
 
         _install_config()
@@ -695,10 +695,10 @@ class TestRemoveConfig:
             paths (dict[str, Path]): Fixture redirecting all installer paths to
                                      tmp_path.
         """
-        paths["config_dir"].mkdir(parents=True, exist_ok=True)
+        paths["CONF_DIR"].mkdir(parents=True, exist_ok=True)
         _remove_config()
 
-        assert not paths["config_dir"].exists()
+        assert not paths["CONF_DIR"].exists()
 
     def test_noop_when_config_missing(self, paths: dict[str, Path]) -> None:
         """No error is raised when the config directory is already absent.

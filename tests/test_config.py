@@ -28,11 +28,11 @@ class TestLoadConfig:
         Args:
             tmp_path (Path): Temporary directory used as parent for a missing
                              config path.
-            monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE to the
+            monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE to the
                                               missing path in tmp_path.
         """
         monkeypatch.setattr(
-            "src.config.CONFIG_FILE", tmp_path / "non-existent.ini"
+            "src.config.CONF_FILE", tmp_path / "non-existent.ini"
         )
         cfg = load_config()
 
@@ -49,13 +49,13 @@ class TestLoadConfig:
         Args:
             tmp_path (Path): Temporary directory containing a settings.ini with
                              a custom git_root.
-            monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE to the
+            monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE to the
                                               settings.ini in tmp_path.
         """
-        config_file = tmp_path / "settings.ini"
-        config_file.write_text("[paths]\ngit_root = /custom/git\n")
+        CONF_FILE = tmp_path / "settings.ini"
+        CONF_FILE.write_text("[paths]\ngit_root = /custom/git\n")
 
-        monkeypatch.setattr("src.config.CONFIG_FILE", config_file)
+        monkeypatch.setattr("src.config.CONF_FILE", CONF_FILE)
 
         cfg = load_config()
 
@@ -69,13 +69,13 @@ class TestLoadConfig:
         Args:
             tmp_path (Path): Temporary directory containing a settings.ini that
                              overrides only git_root.
-            monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE to the
+            monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE to the
                                               settings.ini in tmp_path.
         """
-        config_file = tmp_path / "settings.ini"
-        config_file.write_text("[paths]\ngit_root = /custom/git\n")
+        CONF_FILE = tmp_path / "settings.ini"
+        CONF_FILE.write_text("[paths]\ngit_root = /custom/git\n")
 
-        monkeypatch.setattr("src.config.CONFIG_FILE", config_file)
+        monkeypatch.setattr("src.config.CONF_FILE", CONF_FILE)
 
         cfg = load_config()
 
@@ -90,11 +90,11 @@ class TestLoadConfig:
 
         Args:
             tmp_path (Path): Parent for a config path that does not exist.
-            monkeypatch (pytest.MonkeyPatch): Redirects CONFIG_FILE into
+            monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE into
                                               tmp_path.
         """
         monkeypatch.setattr(
-            "src.config.CONFIG_FILE", tmp_path / "non-existent.ini"
+            "src.config.CONF_FILE", tmp_path / "non-existent.ini"
         )
 
         cfg = load_config()
@@ -161,9 +161,9 @@ class TestGetExportPath:
                              user-dirs.dirs file.
         """
         cfg = configparser.ConfigParser()
-        config_dir = tmp_path / ".config"
-        config_dir.mkdir()
-        (config_dir / "user-dirs.dirs").write_text(
+        CONF_DIR = tmp_path / ".config"
+        CONF_DIR.mkdir()
+        (CONF_DIR / "user-dirs.dirs").write_text(
             'XDG_DESKTOP_DIR="$HOME/XDGDesktop"\n'
         )
 

@@ -165,15 +165,15 @@ class TestApplyMigrations:
         Returns:
             tuple[Path, Path]: (old_desktop, new_export_path) directories.
         """
-        config_file = tmp_path / "settings.ini"
-        config_file.write_text(_V010_INI, encoding="utf-8")
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
+        CONF_FILE = tmp_path / "settings.ini"
+        CONF_FILE.write_text(_V010_INI, encoding="utf-8")
+        CONF_DIR = tmp_path / "config"
+        CONF_DIR.mkdir()
 
         # Point both module namespaces at the temp config / dir.
-        monkeypatch.setattr("src.migrations.CONFIG_FILE", config_file)
-        monkeypatch.setattr("src.migrations.CONFIG_DIR", config_dir)
-        monkeypatch.setattr("src.config.CONFIG_FILE", config_file)
+        monkeypatch.setattr("src.migrations.CONF_FILE", CONF_FILE)
+        monkeypatch.setattr("src.migrations.CONF_DIR", CONF_DIR)
+        monkeypatch.setattr("src.config.CONF_FILE", CONF_FILE)
 
         # Stub the example-config writer to avoid running the full installer.
         monkeypatch.setattr(
@@ -192,7 +192,7 @@ class TestApplyMigrations:
 
         Args:
             tmp_path (Path): Temporary home directory used for all paths.
-            monkeypatch (pytest.MonkeyPatch): Patches CONFIG_FILE, home,
+            monkeypatch (pytest.MonkeyPatch): Patches CONF_FILE, home,
                 platform.
         """
         old_desktop, new_export = self._setup(tmp_path, monkeypatch)
@@ -221,7 +221,7 @@ class TestApplyMigrations:
 
         Args:
             tmp_path (Path): Temporary home directory.
-            monkeypatch (pytest.MonkeyPatch): Patches CONFIG_FILE, home,
+            monkeypatch (pytest.MonkeyPatch): Patches CONF_FILE, home,
                 platform.
         """
         self._setup(tmp_path, monkeypatch)

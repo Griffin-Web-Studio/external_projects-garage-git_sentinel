@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Callable
 
-from .. import CONFIG_FILE
+from .. import CONF_FILE
 from ..configmigrate import MigrationStep
 
 
@@ -44,7 +44,7 @@ def show_migration_dialog(
     body += (
         "\nClick Update to apply automatically,\n"
         "or Dismiss to handle it manually.\n\n"
-        f"Settings file:\n{CONFIG_FILE}"
+        f"Settings file:\n{CONF_FILE}"
     )
 
     tk.Label(

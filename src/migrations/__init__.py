@@ -4,7 +4,7 @@ import shutil
 import warnings
 from pathlib import Path
 
-from .. import CONFIG_DIR, CONFIG_FILE
+from .. import CONF_DIR, CONF_FILE
 from ..configmigrate import MigrationChain
 from ..configmigrate.ini import IniAdapter
 
@@ -21,7 +21,7 @@ chain: MigrationChain = MigrationChain(
 
 
 def make_adapter() -> IniAdapter:
-    return IniAdapter(CONFIG_FILE)
+    return IniAdapter(CONF_FILE)
 
 
 def apply_migrations() -> OSError | None:
@@ -51,7 +51,7 @@ def apply_migrations() -> OSError | None:
 
         from ..installer import _render_example_config
 
-        (CONFIG_DIR / "settings.example.ini").write_text(
+        (CONF_DIR / "settings.example.ini").write_text(
             _render_example_config(), encoding="utf-8"
         )
 

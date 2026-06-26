@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import APP_NAME, APP_VERSION, CONFIG_DIR, STATE_DIR
+from . import APP_NAME, APP_VERSION, CONF_DIR, STATE_DIR
 from .config_template import render_config, wrap_comment
 from .models import ConfigEntry, ConfigSection
 
@@ -294,11 +294,11 @@ def _install_config() -> None:
     """Create config dir, write the platform-specific example, and seed the live
     settings.ini from it on first install.
     """
-    example_dst = CONFIG_DIR / "settings.example.ini"
-    config = CONFIG_DIR / "settings.ini"
+    example_dst = CONF_DIR / "settings.example.ini"
+    config = CONF_DIR / "settings.ini"
     content = _render_example_config()
 
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CONF_DIR.mkdir(parents=True, exist_ok=True)
     example_dst.write_text(content, encoding="utf-8")
     print(f"Installed example\t→ {example_dst}")
 
@@ -579,12 +579,12 @@ def _remove_binary() -> None:
 
 def _remove_config() -> None:
     """removes the config dir"""
-    if CONFIG_DIR.exists():
-        shutil.rmtree(CONFIG_DIR)
-        print(f"Removed config\t\t→ {CONFIG_DIR}")
+    if CONF_DIR.exists():
+        shutil.rmtree(CONF_DIR)
+        print(f"Removed config\t\t→ {CONF_DIR}")
 
     else:
-        print(f"Config not found\t→ {CONFIG_DIR}  (skipping)")
+        print(f"Config not found\t→ {CONF_DIR}  (skipping)")
 
 
 if sys.platform == "linux":
@@ -670,7 +670,7 @@ def install(*, force: bool = False) -> None:
 
     if not force:
         print(f"To run immediately:\t{BINARY_DST} --force")
-        print(f"To configure:\t\t{CONFIG_DIR / 'settings.ini'}")
+        print(f"To configure:\t\t{CONF_DIR / 'settings.ini'}")
 
 
 def uninstall() -> None:
@@ -697,7 +697,7 @@ def uninstall() -> None:
     else:
         print()
         print("Config and run-state left intact:")
-        print(f"  {CONFIG_DIR}")
+        print(f"  {CONF_DIR}")
         print(f"  {STATE_DIR}")
 
     _remove_binary()

@@ -5,7 +5,7 @@ import sys
 import warnings
 from pathlib import Path
 
-from . import CONFIG_FILE
+from . import CONF_FILE
 
 # ──────────────────────────────────────────────────────────────────| Config |──
 
@@ -42,8 +42,8 @@ def load_config() -> configparser.ConfigParser:
     for section, values in _DEFAULTS.items():
         cfg[section] = values  # build config of defaults
 
-    if CONFIG_FILE.exists():
-        cfg.read(CONFIG_FILE)  # update with user values
+    if CONF_FILE.exists():
+        cfg.read(CONF_FILE)  # update with user values
 
     return cfg
 
