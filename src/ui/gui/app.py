@@ -5,9 +5,9 @@ import queue
 from pathlib import Path
 import tkinter as tk
 
-from .. import APP_NAME, APP_VERSION
-from ..migrations import apply_migrations, chain, make_adapter
-from ..models import (
+from src import APP_NAME, APP_VERSION
+from src.migrations import apply_migrations, chain, make_adapter
+from src.models import (
     GateHTTP,
     GateSSH,
     MsgFinish,
@@ -15,9 +15,9 @@ from ..models import (
     MsgProgress,
     MsgStatus,
 )
-from .migration_dialog import show_migration_dialog
-from .prompts import PromptArea
-from .window import MainWindow
+from .views.migration_dialog import show_migration_dialog
+from .views.prompt_area import PromptArea
+from .views.main_window import MainWindow
 
 # ─────────────────────────────────────────────────────────────| Coordinator |──
 
@@ -88,7 +88,7 @@ class GitSentinelApp(tk.Tk):
                 msg = self._ui_queue.get_nowait()
 
                 if isinstance(msg, MsgLog):
-                    self._window.append_log(msg.text)
+                    self._window.append_log(msg.text, msg.tag)
 
                 elif isinstance(msg, MsgStatus):
                     self._window.update_status(msg.text)
@@ -129,13 +129,14 @@ class GitSentinelApp(tk.Tk):
 
     # ── Worker-callable helpers (thread-safe) ─────────────────────────────────
 
-    def log(self, text: str) -> None:
+    def log(self, text: str, tag: str = "") -> None:
         """Append a line to the log pane from any thread.
 
         Args:
             text: Line to append; a newline is added automatically.
+            tag: Optional colour tag ("error", "warning", "info").
         """
-        self._ui_queue.put(MsgLog(text))
+        self._ui_queue.put(MsgLog(text, tag))
 
     def set_status(self, text: str) -> None:
         """Update the status label from any thread.

@@ -4,8 +4,8 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Callable
 
-from .. import CONF_FILE
-from ..configmigrate import MigrationStep
+from src import CONF_FILE
+from src.configmigrate import MigrationStep
 
 
 def show_migration_dialog(
@@ -23,55 +23,61 @@ def show_migration_dialog(
         on_update (Callable[[], OSError | None]): Called when the user clicks
             Update; returns an OSError on failure, None on success.
     """
-    dlg = tk.Toplevel(parent)
-    dlg.title("Config update available")
-    dlg.resizable(False, False)
-    dlg.grab_set()
 
-    frame = tk.Frame(dlg, padx=16, pady=12)
-    frame.pack(fill="both", expand=True)
+    # Dialog Box
+    dialog = tk.Toplevel(parent)
+    dialog.title("Config update available")
+    dialog.resizable(False, False)
+    dialog.grab_set()
 
-    body = "settings.ini has pending updates.\n\n"
+    # Message Box body
+    body = tk.Frame(dialog, padx=16, pady=12)
+    body.pack(fill="both", expand=True)
+
+    contents = "settings.ini has pending updates.\n\n"
 
     for step in pending:
-        body += f"  v{step.from_version} → v{step.to_version}"
+        contents += f"  v{step.from_version} to v{step.to_version}"
 
         if step.description:
-            body += f": {step.description}"
+            contents += f": {step.description}"
 
-        body += "\n"
+        contents += "\n"
 
-    body += (
+    contents += (
         "\nClick Update to apply automatically,\n"
         "or Dismiss to handle it manually.\n\n"
         f"Settings file:\n{CONF_FILE}"
     )
 
+    # Contents printout
     tk.Label(
-        frame,
-        text=body,
+        body,
+        text=contents,
         justify="left",
         anchor="w",
         font=("monospace", 9),
     ).pack(fill="x")
 
-    btn_row = tk.Frame(frame)
-    btn_row.pack(pady=(12, 0))
+    # Buttons row
+    button_row = tk.Frame(body)
+    button_row.pack(pady=(12, 0))
 
     def _do_update() -> None:
-        exc = on_update()
+        exception = on_update()  # returns None on success
 
-        if exc:
+        if exception:
             messagebox.showerror(
-                "Update failed", f"Could not update settings.ini:\n{exc}"
+                "Update failed", f"Could not update settings.ini:\n{exception}"
             )
+
             return
 
-        dlg.destroy()
+        dialog.destroy()
 
-    tk.Button(btn_row, text="Update", width=14, command=_do_update).pack(
+    tk.Button(button_row, text="Update", width=14, command=_do_update).pack(
         side="left", padx=6
     )
-    tk.Button(btn_row, text="Dismiss", width=14, command=dlg.destroy).pack(
-        side="left", padx=6
-    )
+    tk.Button(
+        button_row, text="Dismiss", width=14, command=dialog.destroy
+    ).pack(side="left", padx=6)
