@@ -13,11 +13,11 @@ from src.models import MsgFinish
 # ─────────────────────────────────────────────────────────────────| Helpers |──
 
 
-def _open_file(path: Path) -> None:
-    """Open *path* with the default application, cross-platform.
+def _open_file(path: Path) -> None:  # pragma: no cover - no custom logic
+    """Open *path* with the default MIME application.
 
     Args:
-        path (Path): file path
+        path (Path): file (like report) path
     """
 
     if sys.platform == "win32":
