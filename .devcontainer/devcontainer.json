@@ -43,7 +43,9 @@
       ],
       "settings": {
         "python.testing.pytestArgs": [
-          "tests"
+          "tests",
+          "--cov=src",
+          "--cov-report=lcov"
         ],
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
