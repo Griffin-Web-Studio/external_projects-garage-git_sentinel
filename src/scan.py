@@ -64,18 +64,19 @@ def _gate_ssh(
     if host_key in ssh_declined:
         app.log(
             f"  -> {rname}: skipped "
-            f"(SSH to {host} was declined this session)"
+            f"(SSH to {host} was declined this session)",
+            tag="warning",
         )
         return False
 
     if host_key in ssh_approved:
         return True
 
-    app.log(f"  -> {rname}: SSH remote - awaiting approval for {host}...")
+    app.log(f"  -> {rname}: SSH remote - awaiting approval for {host}src..")
 
     if not app.request_ssh(rurl, short):
         ssh_declined.add(host_key)
-        app.log(f"  -> {rname}: skipped by user")
+        app.log(f"  -> {rname}: skipped by user", tag="warning")
         return False
 
     ssh_approved.add(host_key)
@@ -151,7 +152,10 @@ def _check_remotes(
         success, heads, tags, err = fetch_remote_refs(repo, rname, env=env)
 
         if not success and not ssh:
-            app.log(f"  -> {rname}: HTTP failed ({err}) - prompting for retry")
+            app.log(
+                f"  -> {rname}: HTTP failed ({err}) - prompting for retry",
+                tag="warning",
+            )
 
             if app.request_http_retry(rurl, short, err):
                 success, heads, tags, err = fetch_remote_refs(
@@ -171,7 +175,7 @@ def _check_remotes(
         else:
             rc_obj.skip_reason = RemoteSkipReason.FETCH_FAILED
             rc_obj.skip_error = err[:80]
-            app.log(f"  -> {rname}: unreachable - {err[:80]}")
+            app.log(f"  -> {rname}: unreachable - {err[:80]}", tag="error")
 
     return remote_heads_map, remote_tags_map
 
@@ -218,7 +222,7 @@ def _scan_repo(
     result.is_stale, result.last_commit_date = check_stale(repo, stale_days)
 
     if not result.has_remote:
-        app.log("  ! No remote configured")
+        app.log("  ! No remote configured", tag="error")
         app.log("")
 
         return result
@@ -264,7 +268,10 @@ def _scan_repo(
     if result.tag_issues:
         parts.append(f"{len(result.tag_issues)} tag issue(s)")
 
-    app.log(f"  {'!  ' + '; '.join(parts) if parts else 'OK  clean'}")
+    if parts:
+        app.log(f"  !  {'; '.join(parts)}", tag="warning")
+    else:
+        app.log("  OK  clean")
     app.log("")
 
     return result
@@ -288,7 +295,8 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
         if cfg.get("paths", "desktop_override").strip():
             app.log(
                 "DEPRECATED: settings.ini uses 'desktop_override';"
-                " rename it to 'export_path' to silence this warning."
+                " rename it to 'export_path' to silence this warning.",
+                tag="warning",
             )
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
@@ -304,19 +312,20 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
         use_cm = False
     stale_days = cfg.getint("staleness", "stale_threshold_days")
 
-    app.log(f"{APP_NAME}  v{APP_VERSION}")
+    app.log(f"{APP_NAME}  v{APP_VERSION}", tag="info")
     app.log(f"Scan root     : {git_root}")
     app.log(f"Reports Path  : {export_path}")
     app.log("")
 
     # ── Stage 1: Discovery ────────────────────────────────────────────────────
 
-    app.set_status("Stage 1 / 3 - Discovering repositories...")
-    app.log("=== Stage 1: Repository discovery ===")
+    app.set_status("Stage 1 / 3 - Discovering repositoriessrc..")
+    app.log("=== Stage 1: Repository discovery ===", tag="info")
 
     if not git_root.is_dir():
         app.log(
-            f"ERROR: scan root '{git_root}' does not exist - nothing to do."
+            f"ERROR: scan root '{git_root}' does not exist - nothing to do.",
+            tag="error",
         )
         app.set_progress(100.0)
         app.finish(0, None)
@@ -334,9 +343,9 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
 
     app.set_status(
         f"Stage 2 / 3 - Scanning {total} "
-        f"repositor{'y' if total == 1 else 'ies'}..."
+        f"repositor{'y' if total == 1 else 'ies'}src.."
     )
-    app.log("=== Stage 2: Local and remote checks ===")
+    app.log("=== Stage 2: Local and remote checks ===", tag="info")
 
     ssh_approved: set[str] = set()
     ssh_declined: set[str] = set()
@@ -361,14 +370,15 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
 
     # ── Stage 3: Report ───────────────────────────────────────────────────────
 
-    app.set_status("Stage 3 / 3 - Generating report...")
+    app.set_status("Stage 3 / 3 - Generating reportsrc..")
     app.set_progress(90.0)
-    app.log("=== Stage 3: Report ===")
+    app.log("=== Stage 3: Report ===", tag="info")
 
     if cfg.has_option("paths", "reports_archive"):
         app.log(
             "DEPRECATED: settings.ini uses 'reports_archive' which is no"
-            " longer needed. See the deprecation notice at startup."
+            " longer needed. See the deprecation notice at startup.",
+            tag="warning",
         )
 
     prev_keys = load_previous_issue_keys(export_path)
@@ -396,7 +406,8 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
     if cfg.has_option("reports", "desktop_retention_days"):
         app.log(
             "DEPRECATED: settings.ini uses 'desktop_retention_days';"
-            " rename it to 'retention_days' to silence this warning."
+            " rename it to 'retention_days' to silence this warning.",
+            tag="warning",
         )
         retention = cfg.getint("reports", "desktop_retention_days")
     else:
