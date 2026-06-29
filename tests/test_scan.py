@@ -34,7 +34,7 @@ class FakeApp:
         self.ssh_response = ssh_response
         self.http_retry_response = http_retry_response
 
-    def log(self, text: str) -> None:
+    def log(self, text: str, tag: str = "") -> None:
         self.logs.append(text)
 
     def set_status(self, text: str) -> None:
