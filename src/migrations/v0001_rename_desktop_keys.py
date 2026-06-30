@@ -6,8 +6,8 @@ if TYPE_CHECKING:
     from src.configmigrate import ConfigAdapter
 
 description = (
-    "Rename 'desktop_override' → 'export_path' and "
-    "'desktop_retention_days' → 'retention_days'; "
+    "Rename 'desktop_override' to 'export_path' and "
+    "'desktop_retention_days' to 'retention_days'; "
     "carry 'reports_archive' value to 'export_path'"
 )
 
