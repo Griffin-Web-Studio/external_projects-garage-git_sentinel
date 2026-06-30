@@ -1,3 +1,14 @@
+## v0.2.1 (2026-06-30)
+
+### Bug Fixes
+
+- **platform:winslop**: ensure migrations ae also included in win pkg
+
+### Refactoring
+
+- **installer**: ensure export_path is enforced
+- **app/init**: update consts and cleanup code
+
 ## v0.2.0 (2026-06-25)
 
 ### Bug Fixes

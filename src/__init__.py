@@ -7,7 +7,7 @@ from pathlib import Path
 
 # ────────────────────────────────────────────────────────────────────| Meta |──
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.2.1"
 APP_NAME = "git-sentinel"
 
 # ──────────────────────────────────────────────────────────| Platform paths |──

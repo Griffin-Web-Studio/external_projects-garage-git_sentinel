@@ -8,7 +8,7 @@
 [![coverage: linux](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test&label=coverage%3A+linux)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test)
 [![coverage: windows](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test%3Awindows&label=coverage%3A+windows)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test%3Awindows)
 
-# Local Git Sentinel (v0.2.0)
+# Local Git Sentinel (v0.2.1)
 
 Lost work due to a corrupted drive or dead SSD/HDD? Cry no more - the data is
 gone, but you've learned your lesson about not pushing for days on end. Now you
@@ -31,7 +31,7 @@ No Python, no system packages. The binary is self-contained.
 ## Installation
 
 Download the latest binary from the
-[Releases page](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/releases/v0.2.0)
+[Releases page](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/releases/v0.2.1)
 and run it:
 
 ```bash
