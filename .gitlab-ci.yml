@@ -122,7 +122,7 @@ test:
   script:
     - uv sync --frozen --group dev
     - uv run mypy --strict src/ git-sentinel
-    - uv run pytest -q -m "not windows_only" --cov=src --cov-report=term-missing
+    - xvfb-run --auto-servernum uv run pytest -q -m "not windows_only" --cov=src --cov-report=term-missing
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
 # Uses Windows runner.
