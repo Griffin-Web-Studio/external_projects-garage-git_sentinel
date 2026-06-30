@@ -32,6 +32,7 @@ uv run pyinstaller `
     --workpath build `
     --specpath build `
     --icon "$ProjectRoot\build\git-sentinel.ico" `
+    --collect-submodules src.migrations `
     git-sentinel
 
 if (-not (Test-Path "$ProjectRoot\dist\git-sentinel.exe")) {
