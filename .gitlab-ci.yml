@@ -118,6 +118,7 @@ test:
   stage: test
   image: python:3.14
   before_script:
+    - apt-get update -qq && apt-get install -y -qq xvfb tk
     - pip install uv --quiet
   script:
     - uv sync --frozen --group dev
