@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import configparser
-import queue
-from pathlib import Path
+from collections.abc import Callable
+from typing import Any
 import tkinter as tk
 
 from src import APP_NAME, APP_VERSION
+from src.controllers.events import EventBus
+from src.controllers.scan import ScanController
 from src.migrations import apply_migrations, chain, make_adapter
 from src.models import (
     GateHTTP,
@@ -16,19 +18,18 @@ from src.models import (
     MsgStatus,
 )
 from .views.migration_dialog import show_migration_dialog
-from .views.prompt_area import PromptArea
 from .views.main_window import MainWindow
+from .views.prompt_area import PromptArea
 
 # ─────────────────────────────────────────────────────────────| Coordinator |──
 
 
 class GitSentinelApp(tk.Tk):
-    """Application root window and AppProtocol implementer.
+    """Application root window.
 
-    Owns the two inter-thread queues, runs the drain timers on the Tk event
-    loop, and exposes the worker-callable surface that scan.py uses via
-    AppProtocol. All widget work is delegated to MainWindow; gate prompt
-    rendering to PromptArea.
+    Owns the EventBus and ScanController, wires bus events to the Tkinter views
+    via thread-safe after() adapters, and manages window lifecycle. All widget
+    work is delegated to MainWindow; gate prompt rendering to PromptArea.
 
     Args:
         cfg: Loaded application config parser.
@@ -37,178 +38,117 @@ class GitSentinelApp(tk.Tk):
     def __init__(self, cfg: configparser.ConfigParser) -> None:
         super().__init__()
 
-        # scan.py reads repo paths and thresholds from cfg at runtime
-        self.cfg = cfg
+        self._cfg = cfg
 
         # window chrome
         self.title(f"{APP_NAME}  v{APP_VERSION}")
         self.minsize(680, 480)
         self.resizable(True, True)
-
-        # intercept the x button so users can't close the window mid-scan
         self.protocol("WM_DELETE_WINDOW", self._guard_close)
 
-        # flipped to True by MsgFinish; gates both the x button and close button
-        self._closable = False
-
-        # _ui_queue: fire-and-forget - worker puts Msg* objects, main thread
-        # drains them every 80 ms. Keeps all Tkinter calls on the main thread
-        # because Tk is not thread-safe.
-        self._ui_queue: queue.Queue[
-            MsgLog | MsgStatus | MsgProgress | MsgFinish
-        ] = queue.Queue()
-
-        # _gate_queue: blocking - worker puts a Gate* then waits on gate.event
-        # until the user responds and the main thread calls event.set()
-        self._gate_queue: queue.Queue[GateSSH | GateHTTP] = queue.Queue()
-
+        # views
         self._window = MainWindow(self, on_close=self._on_close_btn)
         self._prompts = PromptArea(self._window.prompt_container)
 
-        # kick off the polling loops; each reschedules itself indefinitely
-        self.after(80, self._drain_ui_queue)
-        self.after(80, self._check_gate_queue)
+        # controller + bus
+        self._bus = EventBus()
+        self._controller = ScanController(self._bus)
+        self._subscribe()
 
+        # migration dialog (scheduled so the window renders first)
         pending = chain.pending(make_adapter())
         if pending:
+            self.after(
+                0,
+                lambda: show_migration_dialog(self, pending, apply_migrations),
+            )
 
-            def _show_migration() -> None:
-                show_migration_dialog(self, pending, apply_migrations)
+    # ── Public ────────────────────────────────────────────────────────────────
 
-            self.after(0, _show_migration)
+    def start_scan(self) -> None:
+        """Start the scan worker via the controller."""
 
-    # ── Queue drains (main thread) ────────────────────────────────────────────
+        self._controller.start_scan(self._cfg)
 
-    def _drain_ui_queue(self) -> None:
-        """Process all pending UI messages then reschedule itself."""
-        try:
-            # Loop until the queue is empty so the full backlog is flushed in
-            # one tick - avoids visible lag when the worker emits a burst.
-            while True:
-                msg = self._ui_queue.get_nowait()
+    # ── Bus subscriptions ─────────────────────────────────────────────────────
 
-                if isinstance(msg, MsgLog):
-                    self._window.append_log(msg.text, msg.tag)
+    def _subscribe(self) -> None:
+        """Wire bus events to views via thread-safe Tkinter after() adapters."""
 
-                elif isinstance(msg, MsgStatus):
-                    self._window.update_status(msg.text)
+        def thread_safe(fn: Callable[[Any], None]) -> Callable[[Any], None]:
+            def wrapper(data: Any) -> None:
+                self.after(0, lambda: fn(data))
 
-                elif isinstance(msg, MsgProgress):
-                    self._window.update_progress(msg.pct)
+            return wrapper
 
-                elif isinstance(msg, MsgFinish):
-                    # Unlock close before handle_finish so the button is
-                    # immediately active when it becomes visible.
-                    self._closable = True
-                    self._window.handle_finish(msg)
+        self._bus.subscribe("scan.log", thread_safe(self._on_log))
+        self._bus.subscribe("scan.status", thread_safe(self._on_status))
+        self._bus.subscribe("scan.progress", thread_safe(self._on_progress))
+        self._bus.subscribe("scan.finish", thread_safe(self._on_finish))
+        self._bus.subscribe("scan.gate", thread_safe(self._on_gate))
 
-        except queue.Empty:
-            pass  # normal exit - queue exhausted for this tick
+    # ── Event handlers (main thread) ──────────────────────────────────────────
 
-        self.after(80, self._drain_ui_queue)
-
-    def _check_gate_queue(self) -> None:
-        """Check for a pending gate request and render its prompt if present."""
-        try:
-            # Only one gate is processed per tick. The worker blocks on
-            # gate.event until the user responds, so a second gate cannot
-            # arrive until the first is resolved.
-            req = self._gate_queue.get_nowait()
-            self.bell()  # audible alert so the user notices the prompt
-
-            if isinstance(req, GateSSH):
-                self._prompts.show_ssh(req)
-
-            elif isinstance(req, GateHTTP):
-                self._prompts.show_http(req)
-
-        except queue.Empty:
-            pass
-
-        self.after(150, self._check_gate_queue)
-
-    # ── Worker-callable helpers (thread-safe) ─────────────────────────────────
-
-    def log(self, text: str, tag: str = "") -> None:
-        """Append a line to the log pane from any thread.
+    def _on_log(self, msg: MsgLog) -> None:
+        """On log handler
 
         Args:
-            text: Line to append; a newline is added automatically.
-            tag: Optional colour tag ("error", "warning", "info").
+            msg (MsgLog): Message Log Object
         """
-        self._ui_queue.put(MsgLog(text, tag))
 
-    def set_status(self, text: str) -> None:
-        """Update the status label from any thread.
+        self._window.append_log(msg.text, msg.tag)
+
+    def _on_status(self, msg: MsgStatus) -> None:
+        """On status handler
 
         Args:
-            text: New status string.
+            msg (MsgStatus): Message Status Object
         """
-        self._ui_queue.put(MsgStatus(text))
 
-    def set_progress(self, pct: float) -> None:
-        """Set the progress bar value from any thread.
+        self._window.update_status(msg.text)
+
+    def _on_progress(self, msg: MsgProgress) -> None:
+        """On progress handler
 
         Args:
-            pct: Percentage between 0.0 and 100.0.
+            msg (MsgProgress): Message Progress Object
         """
-        self._ui_queue.put(MsgProgress(pct))
 
-    def finish(self, issue_count: int, report_path: Path | None) -> None:
-        """Signal scan completion from the worker thread.
+        self._window.update_progress(msg.pct)
+
+    def _on_finish(self, msg: MsgFinish) -> None:
+        """On finish handler
 
         Args:
-            issue_count: Number of repositories with at least one issue.
-            report_path: Path to the written report, or None for a clean run.
+            msg (MsgFinish): Message Finish Object
         """
-        self._ui_queue.put(MsgFinish(issue_count, report_path))
 
-    def request_ssh(self, url: str, repo_short: str) -> bool:
-        """Block the worker until the user approves or declines SSH for this
-        host.
+        self._window.handle_finish(msg)
 
-        Places a GateSSH on the gate queue and waits on its event. The main
-        thread renders the prompt and sets the event when the user responds.
+    def _on_gate(self, req: GateSSH | GateHTTP) -> None:
+        """On gate handler
 
         Args:
-            url: SSH remote URL requiring approval.
-            repo_short: Tilde-prefixed repo path shown in the prompt.
-
-        Returns:
-            bool: True if the user approved, False if declined.
+            req (GateSSH | GateHTTP): Gate Type (SSH/HTTP) Object
         """
-        req = GateSSH(url, repo_short)
-        self._gate_queue.put(req)
 
-        # blocks the worker thread here until _resolve_ssh sets the event
-        req.event.wait()
-        return req.approved
+        self.bell()  # Alert the user
 
-    def request_http_retry(self, url: str, repo_short: str, error: str) -> bool:
-        """Block the worker until the user chooses to retry or skip an HTTP
-        remote.
+        if isinstance(req, GateSSH):
+            self._prompts.show_ssh(req)
 
-        Args:
-            url: HTTP remote URL that failed.
-            repo_short: Tilde-prefixed repo path shown in the prompt.
-            error: Error string from the failed fetch.
-
-        Returns:
-            bool: True if the user requested a retry, False to skip.
-        """
-        req = GateHTTP(url, repo_short, error)
-        self._gate_queue.put(req)
-        # blocks the worker thread here until _resolve_http sets the event
-        req.event.wait()
-        return req.retry
+        elif isinstance(req, GateHTTP):
+            self._prompts.show_http(req)
 
     # ── Close guards ──────────────────────────────────────────────────────────
 
     def _guard_close(self) -> None:
         """Handle WM close button; ignored while scan is running."""
-        if self._closable:
+
+        if self._controller.closable:
             self.destroy()
 
     def _on_close_btn(self) -> None:
         """Handle the Close / Acknowledge button."""
+
         self.destroy()

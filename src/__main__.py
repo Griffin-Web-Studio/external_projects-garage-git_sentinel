@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-import threading
 
 from src.config import load_config
 from src.installer import install, is_installed, uninstall
 from src.schedule import should_run_today
 from .ui.gui.app import GitSentinelApp
-from .scan import scan
 
 from . import APP_NAME
 
@@ -75,8 +73,7 @@ def main() -> None:
         sys.exit(0)
 
     app = GitSentinelApp(cfg)
-    worker = threading.Thread(target=scan, args=(app, cfg), daemon=True)
-    worker.start()
+    app.start_scan()
     app.mainloop()
 
 
