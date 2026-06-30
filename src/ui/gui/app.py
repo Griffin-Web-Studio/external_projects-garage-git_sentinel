@@ -6,6 +6,7 @@ from typing import Any
 import tkinter as tk
 
 from src import APP_NAME, APP_VERSION
+from src.config import load_config
 from src.controllers.events import EventBus
 from src.controllers.scan import ScanController
 from src.migrations import apply_migrations, chain, make_adapter
@@ -73,11 +74,20 @@ class GitSentinelApp(tk.Tk):
                 self,
                 pending,
                 apply_migrations,
-                on_close=lambda: self._controller.start_scan(self._cfg),
+                on_close=self._start_after_migration,
             )
 
         else:
             self._controller.start_scan(self._cfg)
+
+    def _start_after_migration(self) -> None:
+        """Reload config from disk after migrations are applied, then scan.
+
+        The in-memory config predates the migration; reloading ensures the scan
+        runs against the updated values and no DEPRECATED warnings are emitted.
+        """
+        self._cfg = load_config()
+        self._controller.start_scan(self._cfg)
 
     # ── Bus subscriptions ─────────────────────────────────────────────────────
 
