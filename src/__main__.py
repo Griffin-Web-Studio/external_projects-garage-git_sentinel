@@ -73,7 +73,6 @@ def main() -> None:
         sys.exit(0)
 
     app = GitSentinelApp(cfg)
-    app.start_scan()
     app.mainloop()
 
 

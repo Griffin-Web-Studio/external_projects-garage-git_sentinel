@@ -55,20 +55,29 @@ class GitSentinelApp(tk.Tk):
         self._controller = ScanController(self._bus)
         self._subscribe()
 
-        # migration dialog (scheduled so the window renders first)
+        # defer startup so the window renders before any dialog or scan begins
+        self.after(0, self._begin)
+
+    # ── Startup sequencing ────────────────────────────────────────────────────
+
+    def _begin(self) -> None:
+        """Apply pending migrations (if any), then start the scan.
+
+        Migrations are resolved first; the scan only starts after the dialog
+        is dismissed so the two cannot race.
+        """
         pending = chain.pending(make_adapter())
+
         if pending:
-            self.after(
-                0,
-                lambda: show_migration_dialog(self, pending, apply_migrations),
+            show_migration_dialog(
+                self,
+                pending,
+                apply_migrations,
+                on_close=lambda: self._controller.start_scan(self._cfg),
             )
 
-    # ── Public ────────────────────────────────────────────────────────────────
-
-    def start_scan(self) -> None:
-        """Start the scan worker via the controller."""
-
-        self._controller.start_scan(self._cfg)
+        else:
+            self._controller.start_scan(self._cfg)
 
     # ── Bus subscriptions ─────────────────────────────────────────────────────
 

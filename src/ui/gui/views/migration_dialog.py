@@ -12,16 +12,21 @@ def show_migration_dialog(
     parent: tk.Misc,
     pending: list[MigrationStep],
     on_update: Callable[[], OSError | None],
+    on_close: Callable[[], None] | None = None,
 ) -> None:
     """Show a modal dialog listing pending config migrations.
 
     Offers to apply them automatically or dismiss for manual handling.
+    `on_close` is called after the dialog is dismissed via either button so
+    callers can sequence work that must not start until migrations are resolved.
 
     Args:
         parent (tk.Misc): Parent widget the dialog is transient to.
         pending (list[MigrationStep]): Steps to display and optionally apply.
         on_update (Callable[[], OSError | None]): Called when the user clicks
             Update; returns an OSError on failure, None on success.
+        on_close (Callable[[], None] | None): Optional callback invoked after
+            the dialog is dismissed (both Update success and Dismiss paths).
     """
 
     # Dialog Box
@@ -63,6 +68,11 @@ def show_migration_dialog(
     button_row = tk.Frame(body)
     button_row.pack(pady=(12, 0))
 
+    def _dismiss() -> None:
+        dialog.destroy()
+        if on_close:
+            on_close()
+
     def _do_update() -> None:
         exception = on_update()  # returns None on success
 
@@ -73,11 +83,11 @@ def show_migration_dialog(
 
             return
 
-        dialog.destroy()
+        _dismiss()
 
     tk.Button(button_row, text="Update", width=14, command=_do_update).pack(
         side="left", padx=6
     )
-    tk.Button(
-        button_row, text="Dismiss", width=14, command=dialog.destroy
-    ).pack(side="left", padx=6)
+    tk.Button(button_row, text="Dismiss", width=14, command=_dismiss).pack(
+        side="left", padx=6
+    )
