@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.schedule import should_run_today
+from src.services.schedule import should_run_today
 
 # ────────────────────────────────────────────────────────| should_run_today |──
 
@@ -38,8 +38,10 @@ class TestShouldRunToday:
             tmp_path (Path): Isolated temporary directory used as STATE_DIR and parent of the lock file.
             monkeypatch (pytest.MonkeyPatch): Redirects STATE_DIR and LOCK_FILE to tmp_path.
         """
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", tmp_path / "lock")
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr(
+            "src.services.schedule.LOCK_FILE", tmp_path / "lock"
+        )
 
         assert should_run_today(_cfg(), force=True) is True
 
@@ -52,8 +54,10 @@ class TestShouldRunToday:
             tmp_path (Path): Isolated temporary directory used as STATE_DIR and parent of the lock file.
             monkeypatch (pytest.MonkeyPatch): Redirects STATE_DIR and LOCK_FILE to tmp_path.
         """
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", tmp_path / "lock")
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr(
+            "src.services.schedule.LOCK_FILE", tmp_path / "lock"
+        )
 
         assert should_run_today(_cfg(once_per_day=False)) is True
 
@@ -67,8 +71,8 @@ class TestShouldRunToday:
             monkeypatch (pytest.MonkeyPatch): Redirects STATE_DIR and LOCK_FILE to tmp_path.
         """
         lock = tmp_path / "lock"
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", lock)
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr("src.services.schedule.LOCK_FILE", lock)
 
         assert should_run_today(_cfg()) is True
 
@@ -82,8 +86,8 @@ class TestShouldRunToday:
             monkeypatch (pytest.MonkeyPatch): Redirects STATE_DIR and LOCK_FILE to tmp_path.
         """
         lock = tmp_path / "lock"
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", lock)
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr("src.services.schedule.LOCK_FILE", lock)
 
         should_run_today(_cfg())
 
@@ -100,8 +104,8 @@ class TestShouldRunToday:
         """
         lock = tmp_path / "lock"
         lock.write_text(date.today().isoformat())
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", lock)
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr("src.services.schedule.LOCK_FILE", lock)
 
         assert should_run_today(_cfg()) is False
 
@@ -116,8 +120,8 @@ class TestShouldRunToday:
         """
         lock = tmp_path / "lock"
         lock.write_text("2000-01-01")
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", lock)
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr("src.services.schedule.LOCK_FILE", lock)
 
         assert should_run_today(_cfg()) is True
 
@@ -132,8 +136,8 @@ class TestShouldRunToday:
         """
         lock = tmp_path / "lock"
         lock.write_text("2000-01-01")
-        monkeypatch.setattr("src.schedule.STATE_DIR", tmp_path)
-        monkeypatch.setattr("src.schedule.LOCK_FILE", lock)
+        monkeypatch.setattr("src.services.schedule.STATE_DIR", tmp_path)
+        monkeypatch.setattr("src.services.schedule.LOCK_FILE", lock)
 
         should_run_today(_cfg())
 

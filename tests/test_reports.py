@@ -14,7 +14,7 @@ from src.models import (
     RepoResult,
     TagIssue,
 )
-from src.reports import (
+from src.services.reports import (
     _fmt_branch_issue,
     _fmt_skip_reason,
     _fmt_stale_entry,

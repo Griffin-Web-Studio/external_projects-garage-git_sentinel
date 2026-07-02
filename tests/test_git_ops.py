@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import git
 import pytest
 
-from src.git_ops import (
+from src.services.git_ops import (
     analyse_branches_and_tags,
     check_local_state,
     check_stale,
@@ -339,7 +339,7 @@ class TestCheckLocalState:
         mock_repo = MagicMock()
         mock_repo.git.status.return_value = ""
         mock_repo.git.stash.side_effect = git.GitCommandError("stash", 128)
-        with patch("src.git_ops.git.Repo", return_value=mock_repo):
+        with patch("src.services.git_ops.git.Repo", return_value=mock_repo):
             _, _, stashes = check_local_state(Path(repo.working_dir))
 
         assert stashes == []
@@ -405,7 +405,7 @@ class TestCheckStale:
         """
         mock_repo = MagicMock()
         mock_repo.git.log.return_value = ""
-        with patch("src.git_ops.git.Repo", return_value=mock_repo):
+        with patch("src.services.git_ops.git.Repo", return_value=mock_repo):
             stale, last = check_stale(Path(repo.working_dir), threshold_days=30)
 
         assert stale is False
@@ -520,7 +520,7 @@ class TestFetchRemoteRefs:
             "def456\trefs/tags/v1.0.0\n"
             "ghi789\trefs/tags/v1.0.0^{}\n"
         )
-        with patch("src.git_ops.subprocess.run") as mock_run:
+        with patch("src.services.git_ops.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=ls_output, stderr=""
             )
@@ -540,7 +540,7 @@ class TestFetchRemoteRefs:
         Args:
             repo (git.Repo): Fixture providing a repo (path used only).
         """
-        with patch("src.git_ops.subprocess.run") as mock_run:
+        with patch("src.services.git_ops.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=128, stdout="", stderr="not found"
             )
@@ -561,7 +561,7 @@ class TestFetchRemoteRefs:
             repo (git.Repo): Fixture providing a repo (path used only).
         """
         custom_env = {"GIT_SSH_COMMAND": "ssh -o ControlMaster=auto"}
-        with patch("src.git_ops.subprocess.run") as mock_run:
+        with patch("src.services.git_ops.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout="", stderr=""
             )
@@ -577,7 +577,7 @@ class TestFetchRemoteRefs:
             repo (git.Repo): Fixture providing a repo (path used only).
         """
         with patch(
-            "src.git_ops.subprocess.run",
+            "src.services.git_ops.subprocess.run",
             side_effect=subprocess.TimeoutExpired("git", 30),
         ):
             success, heads, tags, err = fetch_remote_refs(
@@ -596,7 +596,7 @@ class TestFetchRemoteRefs:
             repo (git.Repo): Fixture providing a repo (path used only).
         """
         with patch(
-            "src.git_ops.subprocess.run",
+            "src.services.git_ops.subprocess.run",
             side_effect=OSError("connection refused"),
         ):
             success, _, _, err = fetch_remote_refs(
@@ -613,7 +613,7 @@ class TestFetchRemoteRefs:
             repo (git.Repo): Fixture providing a repo (path used only).
         """
         ls_output = "malformed-line\nabc123\trefs/heads/main\n"
-        with patch("src.git_ops.subprocess.run") as mock_run:
+        with patch("src.services.git_ops.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=ls_output, stderr=""
             )

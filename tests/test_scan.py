@@ -14,7 +14,7 @@ from src.models import (
     RepoResult,
     TagIssue,
 )
-from src.scan import _check_remotes, _gate_ssh, _scan_repo, scan
+from src.services.scan import _check_remotes, _gate_ssh, _scan_repo, scan
 
 # ─────────────────────────────────────────────────────────────────| Helpers |──
 
@@ -218,7 +218,7 @@ class TestCheckRemotes:
     ) -> None:
         """A successful ls-remote marks the RemoteCheck as reachable."""
         monkeypatch.setattr(
-            "src.scan.fetch_remote_refs",
+            "src.services.scan.fetch_remote_refs",
             lambda *a, **kw: (True, {"main": "abc"}, {"v1.0"}, ""),
         )
         app = FakeApp()
@@ -235,7 +235,7 @@ class TestCheckRemotes:
     ) -> None:
         """A failed fetch with no retry sets FETCH_FAILED on the check."""
         monkeypatch.setattr(
-            "src.scan.fetch_remote_refs",
+            "src.services.scan.fetch_remote_refs",
             lambda *a, **kw: (False, {}, set(), "connection refused"),
         )
         app = FakeApp(http_retry_response=False)
@@ -258,7 +258,7 @@ class TestCheckRemotes:
             ]
         )
         monkeypatch.setattr(
-            "src.scan.fetch_remote_refs",
+            "src.services.scan.fetch_remote_refs",
             lambda *a, **kw: next(responses),
         )
         app = FakeApp(http_retry_response=True)
@@ -280,7 +280,9 @@ class TestCheckRemotes:
             fetch_called.append(True)
             return True, {}, set(), ""
 
-        monkeypatch.setattr("src.scan.fetch_remote_refs", _fake_fetch_1)
+        monkeypatch.setattr(
+            "src.services.scan.fetch_remote_refs", _fake_fetch_1
+        )
         app = FakeApp(ssh_response=False)
         result = self._result(self.SSH_URL)
         _check_remotes(
@@ -296,7 +298,7 @@ class TestCheckRemotes:
     ) -> None:
         """Approving SSH triggers ls-remote and marks the remote reachable."""
         monkeypatch.setattr(
-            "src.scan.fetch_remote_refs",
+            "src.services.scan.fetch_remote_refs",
             lambda *a, **kw: (True, {}, set(), ""),
         )
         app = FakeApp(ssh_response=True)
@@ -318,7 +320,9 @@ class TestCheckRemotes:
             fetch_called.append(True)
             return True, {}, set(), ""
 
-        monkeypatch.setattr("src.scan.fetch_remote_refs", _fake_fetch_2)
+        monkeypatch.setattr(
+            "src.services.scan.fetch_remote_refs", _fake_fetch_2
+        )
         app = FakeApp()
         result = self._result(self.SSH_URL)
         declined = {"git@github.com"}
@@ -349,22 +353,26 @@ class TestScanRepo:
     ) -> None:
         """Patch all git operations with safe defaults."""
         monkeypatch.setattr(
-            "src.scan.get_remotes",
+            "src.services.scan.get_remotes",
             lambda *a: remotes if remotes is not None else {},
         )
         monkeypatch.setattr(
-            "src.scan.check_local_state",
+            "src.services.scan.check_local_state",
             lambda *a: (uncommitted or [], untracked or [], stashes or []),
         )
-        monkeypatch.setattr("src.scan.check_stale", lambda *a: (False, None))
-        monkeypatch.setattr("src.scan.get_local_branches", lambda *a: [])
-        monkeypatch.setattr("src.scan.get_local_tags", lambda *a: [])
         monkeypatch.setattr(
-            "src.scan.fetch_remote_refs",
+            "src.services.scan.check_stale", lambda *a: (False, None)
+        )
+        monkeypatch.setattr(
+            "src.services.scan.get_local_branches", lambda *a: []
+        )
+        monkeypatch.setattr("src.services.scan.get_local_tags", lambda *a: [])
+        monkeypatch.setattr(
+            "src.services.scan.fetch_remote_refs",
             lambda *a, **kw: (True, {}, set(), ""),
         )
         monkeypatch.setattr(
-            "src.scan.analyse_branches_and_tags", lambda *a: ([], [])
+            "src.services.scan.analyse_branches_and_tags", lambda *a: ([], [])
         )
 
     def test_no_remote_returns_early_and_logs_warning(
@@ -452,7 +460,8 @@ class TestScanRepo:
         )
         ti = TagIssue(tag="v1.0", remote="origin")
         monkeypatch.setattr(
-            "src.scan.analyse_branches_and_tags", lambda *a: ([bi], [ti])
+            "src.services.scan.analyse_branches_and_tags",
+            lambda *a: ([bi], [ti]),
         )
         app = FakeApp()
         _scan_repo(app, self.REPO, 0, 1, set(), set(), None, False, 90)
@@ -474,31 +483,39 @@ class TestScan:
         uncommitted: list[str] | None = None,
     ) -> None:
         """Patch all git and report operations with safe no-op defaults."""
-        monkeypatch.setattr("src.scan.find_git_repos", lambda *a: repos or [])
         monkeypatch.setattr(
-            "src.scan.get_remotes",
+            "src.services.scan.find_git_repos", lambda *a: repos or []
+        )
+        monkeypatch.setattr(
+            "src.services.scan.get_remotes",
             lambda *a: remotes if remotes is not None else {},
         )
         monkeypatch.setattr(
-            "src.scan.check_local_state",
+            "src.services.scan.check_local_state",
             lambda *a: (uncommitted or [], [], []),
         )
-        monkeypatch.setattr("src.scan.check_stale", lambda *a: (False, None))
-        monkeypatch.setattr("src.scan.get_local_branches", lambda *a: [])
-        monkeypatch.setattr("src.scan.get_local_tags", lambda *a: [])
         monkeypatch.setattr(
-            "src.scan.fetch_remote_refs",
+            "src.services.scan.check_stale", lambda *a: (False, None)
+        )
+        monkeypatch.setattr(
+            "src.services.scan.get_local_branches", lambda *a: []
+        )
+        monkeypatch.setattr("src.services.scan.get_local_tags", lambda *a: [])
+        monkeypatch.setattr(
+            "src.services.scan.fetch_remote_refs",
             lambda *a, **kw: (True, {}, set(), ""),
         )
         monkeypatch.setattr(
-            "src.scan.analyse_branches_and_tags", lambda *a: ([], [])
+            "src.services.scan.analyse_branches_and_tags", lambda *a: ([], [])
         )
-        monkeypatch.setattr("src.scan.build_ssh_env", lambda *a: {})
-        monkeypatch.setattr("src.scan.close_ssh_sockets", lambda: None)
+        monkeypatch.setattr("src.services.scan.build_ssh_env", lambda *a: {})
+        monkeypatch.setattr("src.services.scan.close_ssh_sockets", lambda: None)
         monkeypatch.setattr(
-            "src.scan.load_previous_issue_keys", lambda *a: set()
+            "src.services.scan.load_previous_issue_keys", lambda *a: set()
         )
-        monkeypatch.setattr("src.scan.manage_reports", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            "src.services.scan.manage_reports", lambda *a, **kw: None
+        )
 
     def test_missing_git_root_logs_error_and_exits_early(
         self,
