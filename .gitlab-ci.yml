@@ -132,8 +132,6 @@ test:windows:
   stage: test
   tags:
     - windows
-  variables:
-    UV_SYSTEM_PYTHON: "1"
   before_script:
     - pip install uv --quiet
   script:
