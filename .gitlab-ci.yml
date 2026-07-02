@@ -134,10 +134,11 @@ test:windows:
     - windows
   before_script:
     - pip install uv --quiet
-    - uv python install 3.13
-    - uv python pin 3.13
   script:
     - uv sync --frozen --group dev
+    - $base = (python -c "import sys; print(sys.base_prefix)")
+    - $env:TCL_LIBRARY = "$base\tcl\tcl8.6"
+    - $env:TK_LIBRARY = "$base\tcl\tk8.6"
     - uv run mypy --strict src/ git-sentinel
     - uv run pytest -q -m "not linux_only" --cov=src --cov-report=term-missing
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
