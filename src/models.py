@@ -175,7 +175,8 @@ class MsgLog(NamedTuple):
 
     Attributes:
         text: Line to append; a newline is added automatically.
-        tag: Optional colour tag applied to the line ("error", "warning", "info").
+        tag: Optional colour tag applied to the
+            line ("error", "warning", "info").
     """
 
     text: str
