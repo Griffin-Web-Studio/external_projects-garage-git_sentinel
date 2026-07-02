@@ -3,7 +3,7 @@ name = "git-sentinel"
 version = "0.2.1"
 description = "Daily git repository audit tool for Linux desktops"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = ["gitpython>=3.1.50"]
 
 [project.scripts]
@@ -57,7 +57,7 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.13"
 strict = true
 warn_unused_configs = true
 
