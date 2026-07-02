@@ -243,6 +243,17 @@ def _render_example_config() -> str:
                     ),
                 ],
             ),
+            ConfigSection(
+                "meta",
+                [
+                    ConfigEntry(
+                        "version",
+                        "1",
+                        "DO NOT REMOVE!\nUsed to determine the migration"
+                        " version of this config file",
+                    ),
+                ],
+            ),
         ],
     )
 
