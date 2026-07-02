@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -21,10 +19,12 @@ def _open_file(path: Path) -> None:  # pragma: no cover - no custom logic
     """
 
     if sys.platform == "win32":
-        os.startfile(path)
+        from src.platform.windows.gui import open_file
 
     else:
-        subprocess.Popen(["xdg-open", str(path)])
+        from src.platform.linux.gui import open_file
+
+    open_file(path)
 
 
 # ───────────────────────────────────────────────────────────────| Main view |──

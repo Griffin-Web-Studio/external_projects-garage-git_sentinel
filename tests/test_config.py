@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import configparser
-import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from src.config import get_export_path, load_config
-
-windows_only = pytest.mark.skipif(
-    sys.platform != "win32", reason="requires Windows"
-)
 
 # ─────────────────────────────────────────────────────────────| load_config |──
 
@@ -31,6 +26,7 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE to the
                                               missing path in tmp_path.
         """
+
         monkeypatch.setattr(
             "src.config.CONF_FILE", tmp_path / "non-existent.ini"
         )
@@ -52,6 +48,7 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE to the
                                               settings.ini in tmp_path.
         """
+
         CONF_FILE = tmp_path / "settings.ini"
         CONF_FILE.write_text("[paths]\ngit_root = /custom/git\n")
 
@@ -72,11 +69,11 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE to the
                                               settings.ini in tmp_path.
         """
+
         CONF_FILE = tmp_path / "settings.ini"
+
         CONF_FILE.write_text("[paths]\ngit_root = /custom/git\n")
-
         monkeypatch.setattr("src.config.CONF_FILE", CONF_FILE)
-
         cfg = load_config()
 
         # default for a key not touched by the config file still present
@@ -93,6 +90,7 @@ class TestLoadConfig:
             monkeypatch (pytest.MonkeyPatch): Redirects CONF_FILE into
                                               tmp_path.
         """
+
         monkeypatch.setattr(
             "src.config.CONF_FILE", tmp_path / "non-existent.ini"
         )
@@ -111,6 +109,7 @@ class TestGetExportPath:
 
     def test_export_path_used_when_set(self) -> None:
         """An export_path in config overrides XDG/fallback detection."""
+
         cfg = configparser.ConfigParser()
         cfg["paths"] = {"export_path": "MyReports"}
         result = get_export_path(cfg)
@@ -125,6 +124,7 @@ class TestGetExportPath:
             tmp_path (Path): Temporary home directory with no XDG config,
                              ensuring the fallback path is reached.
         """
+
         cfg = configparser.ConfigParser()
         cfg["paths"] = {"export_path": ""}
 
@@ -140,7 +140,9 @@ class TestGetExportPath:
         assert result == tmp_path / "Desktop"
 
     def test_deprecated_desktop_override_still_works(self) -> None:
-        """A legacy desktop_override key is honoured but emits DeprecationWarning."""
+        """A legacy desktop_override key is honoured but emits
+        DeprecationWarning."""
+
         cfg = configparser.ConfigParser()
         cfg["paths"] = {"desktop_override": "OldDesktop"}
 
@@ -160,8 +162,10 @@ class TestGetExportPath:
             tmp_path (Path): Temporary home directory containing a populated
                              user-dirs.dirs file.
         """
+
         cfg = configparser.ConfigParser()
         CONF_DIR = tmp_path / ".config"
+
         CONF_DIR.mkdir()
         (CONF_DIR / "user-dirs.dirs").write_text(
             'XDG_DESKTOP_DIR="$HOME/XDGDesktop"\n'
@@ -181,6 +185,7 @@ class TestGetExportPath:
         Args:
             tmp_path (Path): Temporary home directory with no XDG config.
         """
+
         cfg = configparser.ConfigParser()
 
         with (
@@ -190,39 +195,3 @@ class TestGetExportPath:
             result = get_export_path(cfg)
 
         assert result == tmp_path / "Desktop"
-
-
-# ─────────────────────────────────────────────────────────| Windows (win32) |──
-
-
-@windows_only
-class TestGetExportPathWindows:
-    """Tests _get_export_path_windows reads the default export path from the
-    Windows registry (Shell Folders → Desktop).
-
-    These tests are skipped on Linux (winreg is unavailable) and run only
-    on the Windows CI runner.
-    """
-
-    def test_reads_desktop_path_from_shell_folders(self) -> None:
-        """Returns the path stored in the Shell Folders registry key."""
-        import src.config as _mod
-
-        desktop = r"C:\Users\Alice\Desktop"
-        with patch("src.config._winreg") as mock_reg:
-            mock_reg.OpenKey.return_value = MagicMock()
-            mock_reg.QueryValueEx.return_value = (desktop, 1)
-            result = _mod._get_export_path_windows()
-
-        assert result == Path(desktop)
-
-    def test_oserror_falls_back_to_home_desktop(self) -> None:
-        """OSError from a missing or inaccessible key falls back to
-        ~/Desktop."""
-        import src.config as _mod
-
-        with patch("src.config._winreg") as mock_reg:
-            mock_reg.OpenKey.side_effect = OSError
-            result = _mod._get_export_path_windows()
-
-        assert result == Path.home() / "Desktop"

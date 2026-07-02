@@ -15,6 +15,9 @@ def tk_root() -> Generator[tk.Tk]:
     """
 
     root = tk.Tk()
+
     root.withdraw()
+
     yield root
+
     root.destroy()

@@ -1,67 +1,18 @@
 from __future__ import annotations
 
-import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-from . import APP_NAME, APP_VERSION, CONF_DIR, STATE_DIR
+from . import APP_NAME, CONF_DIR, STATE_DIR
 from src.config.template import render_config, wrap_comment
 from .models import ConfigEntry, ConfigSection
 
 if sys.platform == "win32":
-    import winreg as _winreg
-
-    _localappdata = Path(
-        os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
-    )
-    _appdata = Path(
-        os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming")
-    )
-    BIN_DIR = _localappdata / "Programs" / APP_NAME
-    BINARY_DST = BIN_DIR / f"{APP_NAME}.exe"
-    _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-    _UNINSTALL_KEY = (
-        rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{APP_NAME}"
-    )
-    START_MENU_DIR = (
-        _appdata
-        / "Microsoft"
-        / "Windows"
-        / "Start Menu"
-        / "Programs"
-        / APP_NAME
-    )
-    START_MENU_SHORTCUT = START_MENU_DIR / f"{APP_NAME}.lnk"
-    START_MENU_UNINSTALL = START_MENU_DIR / f"Uninstall {APP_NAME}.lnk"
-
-    _SHELL_FOLDERS_KEY = r"Software\Microsoft\Windows\Shell\User Shell Folders"
-
-    try:
-        _hkey = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, _SHELL_FOLDERS_KEY)
-        _desktop_val, _ = _winreg.QueryValueEx(_hkey, "Desktop")
-        _winreg.CloseKey(_hkey)
-        _desktop_dir = Path(os.path.expandvars(str(_desktop_val)))
-
-    except OSError:
-        _desktop_dir = Path.home() / "Desktop"
-
-    DESKTOP_SHORTCUT = _desktop_dir / f"{APP_NAME}.lnk"
+    from src.platform.windows.installer import BIN_DIR, BINARY_DST
 
 else:
-    _LOCAL = Path.home() / ".local"
-    BIN_DIR = _LOCAL / "bin"
-    BINARY_DST = BIN_DIR / APP_NAME
-
-    AUTOSTART_DIR = Path.home() / ".config" / "autostart"
-    AUTOSTART_FILE = AUTOSTART_DIR / f"{APP_NAME}.desktop"
-
-    APPS_DIR = _LOCAL / "share" / "applications"
-    LAUNCHER_FILE = APPS_DIR / f"{APP_NAME}.desktop"
-
-    ICONS_DIR = _LOCAL / "share" / "icons" / "hicolor" / "scalable" / "apps"
-    ICON_FILE = ICONS_DIR / f"{APP_NAME}.svg"
+    from src.platform.linux.installer import BIN_DIR, BINARY_DST
 
 # ───────────────────────────────────────────────────────────────| Resources |──
 
@@ -78,6 +29,7 @@ def _resource(name: str) -> Path:
     Returns:
         Path: Absolute path to the requested data file.
     """
+
     if hasattr(sys, "_MEIPASS"):
         return Path(sys._MEIPASS) / "data" / name
 
@@ -91,6 +43,7 @@ def _current_binary() -> Path:
     Returns:
         Path: location of binary/script
     """
+
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve()
 
@@ -99,6 +52,7 @@ def _current_binary() -> Path:
 
 def _render_desktop(exec_cmd: str, extra: str) -> str:
     """Fill the single .desktop template for either deployment target."""
+
     return (
         _resource(f"{APP_NAME}.desktop")
         .read_text()
@@ -109,6 +63,7 @@ def _render_desktop(exec_cmd: str, extra: str) -> str:
 
 def _render_example_config() -> str:
     """Generate the settings.example.ini content for the current platform."""
+
     win = sys.platform == "win32"
     sep = "; " + "─" * 78
 
@@ -260,11 +215,13 @@ def _render_example_config() -> str:
 
 def _ask_purge() -> bool:
     """Prompt interactively; default to keeping data when non-interactive."""
+
     if not sys.stdin.isatty():
         return False
 
     try:
         answer = input("\nRemove config and state data? [y/N] ").strip().lower()
+
         return answer in ("y", "yes")
 
     except EOFError:
@@ -276,6 +233,7 @@ def _ask_purge() -> bool:
 
 def is_installed() -> bool:
     """True when the running binary is already the installed copy."""
+
     try:
         return _current_binary().samefile(BINARY_DST)
 
@@ -288,7 +246,9 @@ def is_installed() -> bool:
 
 def _install_binary() -> None:
     """Copies the app binary into a destination location"""
+
     src = _current_binary()
+
     BIN_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -305,6 +265,7 @@ def _install_config() -> None:
     """Create config dir, write the platform-specific example, and seed the live
     settings.ini from it on first install.
     """
+
     example_dst = CONF_DIR / "settings.example.ini"
     config = CONF_DIR / "settings.ini"
     content = _render_example_config()
@@ -316,231 +277,10 @@ def _install_config() -> None:
     if not config.exists():
         config.write_text(content, encoding="utf-8")
         print(f"Created config\t\t→ {config}  (edit to customise)")
+
         return
 
     print(f"Existing config\t\t→ {config}  (left unchanged)")
-
-
-if sys.platform == "linux":
-
-    def _install_icon() -> None:
-        """Create icons dir, and copy the icon inside."""
-        ICONS_DIR.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(str(_resource(f"{APP_NAME}.svg")), str(ICON_FILE))
-
-        print(f"Installed icon\t\t→ {ICON_FILE}")
-
-    def _install_autostart() -> None:
-        """Create icons dir, and copy the icon inside."""
-        AUTOSTART_DIR.mkdir(
-            parents=True, exist_ok=True
-        )  # create autostart dir (if missing)
-
-        content = _render_desktop(
-            str(BINARY_DST), "X-GNOME-Autostart-enabled=true"
-        )
-        AUTOSTART_FILE.write_text(content)  # write autostart desktop entry
-
-        print(f"Registered autostart\t→ {AUTOSTART_FILE}")
-
-
-if sys.platform == "win32":
-
-    def _install_autostart_windows() -> None:
-        """Add a Run registry value so the app launches at Windows login."""
-        key = _winreg.OpenKey(
-            _winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, _winreg.KEY_SET_VALUE
-        )
-        _winreg.SetValueEx(key, APP_NAME, 0, _winreg.REG_SZ, str(BINARY_DST))
-        _winreg.CloseKey(key)
-
-        print(f"Registered autostart\t→ HKCU\\...\\Run\\{APP_NAME}")
-
-    def _remove_autostart_windows() -> None:
-        """Remove the Run registry value added by _install_autostart_windows."""
-        try:
-            key = _winreg.OpenKey(
-                _winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, _winreg.KEY_SET_VALUE
-            )
-            _winreg.DeleteValue(key, APP_NAME)
-            _winreg.CloseKey(key)
-
-            print(f"Removed autostart\t→ HKCU\\...\\Run\\{APP_NAME}")
-
-        except FileNotFoundError:
-            print(
-                f"Autostart not found\t→ HKCU\\...\\Run\\{APP_NAME}  (skipping)"
-            )
-
-    def _create_lnk(
-        lnk: Path, target: Path, args: str, description: str
-    ) -> None:
-        """Create a Windows Shell shortcut (.lnk) via PowerShell COM.
-
-        Uses single-quoted PS strings so the paths are not expanded as
-        variables. Windows paths do not contain single quotes so this is safe.
-        """
-        script = (
-            f"$s = (New-Object -ComObject WScript.Shell)"
-            f".CreateShortcut('{lnk}');"
-            f" $s.TargetPath = '{target}';"
-            f" $s.Arguments = '{args}';"
-            f" $s.Description = '{description}';"
-            f" $s.Save()"
-        )
-
-        subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                script,
-            ],
-            check=True,
-            capture_output=True,
-        )
-
-    def _install_start_menu() -> None:
-        """Create a Start Menu shortcut so the app is discoverable from the
-        Windows shell."""
-        START_MENU_DIR.mkdir(parents=True, exist_ok=True)
-
-        _create_lnk(
-            START_MENU_SHORTCUT,
-            BINARY_DST,
-            "--force",
-            "Daily git repository audit",
-        )
-        print(f"Registered Start Menu\t→ {START_MENU_SHORTCUT}")
-
-    def _ask_desktop_shortcut() -> bool:
-        """Prompt whether to add a Desktop shortcut; defaults to Yes."""
-        if not sys.stdin.isatty():
-            return True
-
-        try:
-            answer = (
-                input("\nCreate a Desktop shortcut? [Y/n] ").strip().lower()
-            )
-
-            return answer not in ("n", "no")
-
-        except EOFError:
-            return True
-
-    def _install_desktop_shortcut() -> None:
-        """Create a Desktop shortcut alongside the Start Menu entry."""
-        _create_lnk(
-            DESKTOP_SHORTCUT,
-            BINARY_DST,
-            "--force",
-            "Daily git repository audit",
-        )
-        print(f"Registered Desktop\t→ {DESKTOP_SHORTCUT}")
-
-    def _install_start_menu_uninstall() -> None:
-        """Create an Uninstall shortcut in the Start Menu subfolder."""
-        _create_lnk(
-            START_MENU_UNINSTALL,
-            BINARY_DST,
-            "--uninstall",
-            f"Uninstall {APP_NAME}",
-        )
-        print(f"Registered uninstall entry\t→ {START_MENU_UNINSTALL}")
-
-    def _install_programs_entry() -> None:
-        """Register the app in Settings > Apps (Add/Remove Programs)."""
-        key = _winreg.CreateKeyEx(
-            _winreg.HKEY_CURRENT_USER,
-            _UNINSTALL_KEY,
-            0,
-            _winreg.KEY_SET_VALUE,
-        )
-        _winreg.SetValueEx(key, "DisplayName", 0, _winreg.REG_SZ, APP_NAME)
-        _winreg.SetValueEx(
-            key,
-            "UninstallString",
-            0,
-            _winreg.REG_SZ,
-            f'"{BINARY_DST}" --uninstall',
-        )
-        _winreg.SetValueEx(
-            key, "DisplayIcon", 0, _winreg.REG_SZ, str(BINARY_DST)
-        )
-        _winreg.SetValueEx(
-            key, "InstallLocation", 0, _winreg.REG_SZ, str(BIN_DIR)
-        )
-        _winreg.SetValueEx(
-            key, "DisplayVersion", 0, _winreg.REG_SZ, APP_VERSION
-        )
-        _winreg.SetValueEx(key, "NoModify", 0, _winreg.REG_DWORD, 1)
-        _winreg.SetValueEx(key, "NoRepair", 0, _winreg.REG_DWORD, 1)
-        _winreg.CloseKey(key)
-        print(f"Registered Programs entry\t→ HKCU\\...\\Uninstall\\{APP_NAME}")
-
-    def _remove_start_menu() -> None:
-        """Remove the main Start Menu shortcut and prune the folder if empty."""
-        if START_MENU_SHORTCUT.exists():
-            START_MENU_SHORTCUT.unlink()
-            print(f"Removed Start Menu\t→ {START_MENU_SHORTCUT}")
-        else:
-            print(f"Start Menu not found\t→ {START_MENU_SHORTCUT}  (skipping)")
-        try:
-            START_MENU_DIR.rmdir()
-        except OSError:
-            pass
-
-    def _remove_start_menu_uninstall() -> None:
-        """Remove the Uninstall shortcut and prune the folder if empty."""
-        if START_MENU_UNINSTALL.exists():
-            START_MENU_UNINSTALL.unlink()
-            print(f"Removed uninstall entry\t→ {START_MENU_UNINSTALL}")
-        else:
-            print(
-                f"Uninstall entry not found\t→ {START_MENU_UNINSTALL}"
-                "  (skipping)"
-            )
-        try:
-            START_MENU_DIR.rmdir()
-        except OSError:
-            pass
-
-    def _remove_programs_entry() -> None:
-        """Remove the app from Settings > Apps (Add/Remove Programs)."""
-        try:
-            _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, _UNINSTALL_KEY)
-            print(f"Removed Programs entry\t→ HKCU\\...\\Uninstall\\{APP_NAME}")
-        except FileNotFoundError:
-            print(
-                f"Programs entry not found\t→ HKCU\\...\\Uninstall\\{APP_NAME}"
-                "  (skipping)"
-            )
-
-    def _remove_desktop_shortcut() -> None:
-        """Remove the Desktop shortcut if present."""
-        if DESKTOP_SHORTCUT.exists():
-            DESKTOP_SHORTCUT.unlink()
-            print(f"Removed Desktop\t\t→ {DESKTOP_SHORTCUT}")
-
-        else:
-            print(f"Desktop not found\t→ {DESKTOP_SHORTCUT}  (skipping)")
-
-
-if sys.platform == "linux":
-
-    def _install_launcher() -> None:
-        """add app launcher entry into launcher"""
-        APPS_DIR.mkdir(
-            parents=True, exist_ok=True
-        )  # create apps dir (if missing)
-
-        content = _render_desktop(
-            f"{BINARY_DST} --force", "Categories=Utility;"
-        )
-        LAUNCHER_FILE.write_text(content)  # write launcher desktop entry
-
-        print(f"Registered launcher\t→ {LAUNCHER_FILE}")
 
 
 # ─────────────────────────────────────────────────────────| Uninstall steps |──
@@ -548,48 +288,24 @@ if sys.platform == "linux":
 
 def _remove_binary() -> None:
     """removes the binary"""
+
     if not BINARY_DST.exists():
         print(f"Binary not found\t→ {BINARY_DST}  (skipping)")
+
         return
 
     if sys.platform == "win32":
-        # Windows locks a running EXE so it cannot be deleted directly.
-        # Rename it first (allowed while running, frees the install path
-        # immediately), then let a detached cmd script delete the renamed
-        # copy and the now-empty directory once this process exits.
-        pending = BINARY_DST.with_name(BINARY_DST.stem + ".uninstalling.exe")
-        BINARY_DST.rename(pending)
-        # PowerShell with -WindowStyle Hidden + CREATE_NO_WINDOW is fully
-        # invisible. Start-Sleep gives this process ~2 s to exit before the
-        # cleanup fires (no cmd / ping required).
-        script = (
-            f"Start-Sleep 2;"
-            f" Remove-Item -Force -LiteralPath '{pending}';"
-            f" Remove-Item -ErrorAction SilentlyContinue '{BIN_DIR}'"
-        )
-        subprocess.Popen(
-            [
-                "powershell",
-                "-WindowStyle",
-                "Hidden",
-                "-NonInteractive",
-                "-NoProfile",
-                "-Command",
-                script,
-            ],
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        print(f"Scheduled binary removal\t→ {BINARY_DST}")
+        from src.platform.windows.installer import remove_binary
+
     else:
-        BINARY_DST.unlink()
-        print(f"Removed binary\t\t→ {BINARY_DST}")
+        from src.platform.linux.installer import remove_binary
+
+    remove_binary()
 
 
 def _remove_config() -> None:
     """removes the config dir"""
+
     if CONF_DIR.exists():
         shutil.rmtree(CONF_DIR)
         print(f"Removed config\t\t→ {CONF_DIR}")
@@ -598,38 +314,9 @@ def _remove_config() -> None:
         print(f"Config not found\t→ {CONF_DIR}  (skipping)")
 
 
-if sys.platform == "linux":
-
-    def _remove_icon() -> None:
-        """remove icon"""
-        if ICON_FILE.exists():
-            ICON_FILE.unlink()
-            print(f"Removed icon\t\t→ {ICON_FILE}")
-
-        else:
-            print(f"Icon not found\t\t→ {ICON_FILE}  (skipping)")
-
-    def _remove_autostart() -> None:
-        """remove autostart entry"""
-        if AUTOSTART_FILE.exists():
-            AUTOSTART_FILE.unlink()
-            print(f"Removed autostart\t→ {AUTOSTART_FILE}")
-
-        else:
-            print(f"Autostart not found\t→ {AUTOSTART_FILE}  (skipping)")
-
-    def _remove_launcher() -> None:
-        """remove launcher entry"""
-        if LAUNCHER_FILE.exists():
-            LAUNCHER_FILE.unlink()
-            print(f"Removed launcher\t→ {LAUNCHER_FILE}")
-
-        else:
-            print(f"Launcher not found\t→ {LAUNCHER_FILE}  (skipping)")
-
-
 def _remove_state() -> None:
     """remove state dir"""
+
     if STATE_DIR.exists():
         shutil.rmtree(STATE_DIR)
         print(f"Removed state\t\t→ {STATE_DIR}")
@@ -647,6 +334,7 @@ def install(*, force: bool = False) -> None:
     Args:
         force (bool, optional): force install flag. Defaults to False.
     """
+
     if sys.platform not in ("linux", "win32"):
         print(
             f"ERROR: {APP_NAME} supports Linux and Windows only.",
@@ -663,18 +351,37 @@ def install(*, force: bool = False) -> None:
     _install_config()
 
     if sys.platform == "linux":
-        _install_icon()
-        _install_autostart()
-        _install_launcher()
+        from src.platform.linux.installer import (
+            install_autostart,
+            install_icon,
+            install_launcher,
+        )
+
+        install_icon(_resource(f"{APP_NAME}.svg"))
+        install_autostart(
+            _render_desktop(str(BINARY_DST), "X-GNOME-Autostart-enabled=true")
+        )
+        install_launcher(
+            _render_desktop(f"{BINARY_DST} --force", "Categories=Utility;")
+        )
 
     else:
-        _install_autostart_windows()
-        _install_start_menu()
-        _install_start_menu_uninstall()
-        _install_programs_entry()
+        from src.platform.windows.installer import (
+            ask_desktop_shortcut,
+            install_autostart_windows,
+            install_desktop_shortcut,
+            install_programs_entry,
+            install_start_menu,
+            install_start_menu_uninstall,
+        )
 
-        if _ask_desktop_shortcut():
-            _install_desktop_shortcut()
+        install_autostart_windows()
+        install_start_menu()
+        install_start_menu_uninstall()
+        install_programs_entry()
+
+        if ask_desktop_shortcut():
+            install_desktop_shortcut()
 
     print()
     print(f"{APP_NAME} installed - will open automatically on next login.")
@@ -688,16 +395,30 @@ def uninstall() -> None:
     """Public API to initialise application uninstallation"""
 
     if sys.platform == "linux":
-        _remove_autostart()
-        _remove_launcher()
-        _remove_icon()
+        from src.platform.linux.installer import (
+            remove_autostart,
+            remove_icon,
+            remove_launcher,
+        )
+
+        remove_autostart()
+        remove_launcher()
+        remove_icon()
 
     else:
-        _remove_autostart_windows()
-        _remove_programs_entry()
-        _remove_start_menu_uninstall()
-        _remove_start_menu()
-        _remove_desktop_shortcut()
+        from src.platform.windows.installer import (
+            remove_autostart_windows,
+            remove_desktop_shortcut,
+            remove_programs_entry,
+            remove_start_menu,
+            remove_start_menu_uninstall,
+        )
+
+        remove_autostart_windows()
+        remove_programs_entry()
+        remove_start_menu_uninstall()
+        remove_start_menu()
+        remove_desktop_shortcut()
 
     purge = _ask_purge()
 

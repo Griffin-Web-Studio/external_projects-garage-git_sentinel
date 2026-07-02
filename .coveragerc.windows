@@ -1,8 +1,9 @@
 [run]
 omit =
     src/__main__.py
-    src/gui/*
-    src/migrations/*
+    src/config/migrations/*
+    src/platform/linux/*
+    src/ui/gui/*
 
 [report]
 show_missing = true

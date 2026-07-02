@@ -15,11 +15,17 @@ from . import APP_NAME
 
 def _pause_if_windows() -> None:
     if sys.platform == "win32":
-        input("\nPress Enter to close...")
+        from src.platform.windows.console import pause
+
+    else:
+        from src.platform.linux.console import pause
+
+    pause()
 
 
 def main() -> None:
     """Application entry point."""
+
     parser = argparse.ArgumentParser(
         prog=APP_NAME,
         description=(

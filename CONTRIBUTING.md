@@ -62,23 +62,29 @@ install it via the [official installer](https://docs.astral.sh/uv/getting-starte
 **Linux / macOS**
 
 ```bash
-.venv/bin/pytest -q                                        # full test suite
-.venv/bin/pytest --cov=src --cov-report=term-missing -q   # with coverage
-.venv/bin/mypy --strict src/ git-sentinel.py               # type-check
+# full test suite
+.venv/bin/pytest -q --ignore=tests/platform/windows
+# with coverage
+.venv/bin/pytest --cov=src --cov-config=.coveragerc.linux --cov-report=term-missing -q --ignore=tests/platform/windows
+# type-check
+.venv/bin/mypy --strict src/ git-sentinel.py
 ```
 
 **Windows**
 
 ```powershell
-.venv\Scripts\pytest -q
-.venv\Scripts\pytest --cov=src --cov-report=term-missing -q
+.venv\Scripts\pytest -q --ignore=tests/platform/linux --ignore=tests/unit/ui/gui
+.venv\Scripts\pytest --cov=src --cov-config=.coveragerc.windows --cov-report=term-missing -q --ignore=tests/platform/linux --ignore=tests/unit/ui/gui
 .venv\Scripts\mypy --strict src/ git-sentinel.py
 ```
 
-The test suite covers all non-GUI modules (225 tests, ~78 % overall). GUI layout
-code is excluded by design - all logic-bearing code (queues, gate protocol, scan
-pipeline, report generation, git ops) is fully covered. The CI pipeline enforces
-a 75 % coverage floor and mypy strict on every push.
+Coverage is tracked separately per platform via `.coveragerc.linux` and
+`.coveragerc.windows`. Linux-only code (`src/platform/linux/`) is excluded
+from the Windows coverage run and vice versa. GUI tests only run on Linux -
+Tkinter under `uv`'s venv on Windows intermittently fails to find `tk`, so
+`src/ui/gui/` is excluded from the Windows coverage run entirely rather than
+run flaky. The CI pipeline enforces a 75 % coverage floor (per platform) and
+mypy strict on every push.
 
 ## Commit messages
 

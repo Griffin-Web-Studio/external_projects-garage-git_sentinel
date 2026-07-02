@@ -37,6 +37,7 @@ def load_config() -> configparser.ConfigParser:
     Returns:
         configparser.ConfigParser: return config values
     """
+
     cfg = configparser.ConfigParser()
 
     for section, values in _DEFAULTS.items():
@@ -57,6 +58,7 @@ def get_export_path(cfg: configparser.ConfigParser) -> Path:
     Returns:
         Path: location of export dir
     """
+
     try:
         override = cfg.get("paths", "export_path").strip()
 
@@ -77,43 +79,16 @@ def get_export_path(cfg: configparser.ConfigParser) -> Path:
                 DeprecationWarning,
                 stacklevel=2,
             )
+
             return Path.home() / override
 
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
 
     if sys.platform == "win32":
-        return _get_export_path_windows()
+        from src.platform.windows.config import get_export_path as _platform_gep
 
-    # get xdg user-dirs.dirs file path
-    xdg_file = Path.home() / ".config" / "user-dirs.dirs"
+    else:
+        from src.platform.linux.config import get_export_path as _platform_gep
 
-    if xdg_file.exists():
-        for line in xdg_file.read_text().splitlines():  # read lines
-            if line.strip().startswith("XDG_DESKTOP_DIR"):  # find desktop loc
-                val = line.split("=", 1)[1].strip().strip('"')  # get value
-
-                # return User XDG desktop path
-                return Path(val.replace("$HOME", str(Path.home())))
-
-    return Path.home() / "Desktop"
-
-
-if sys.platform == "win32":
-    import winreg as _winreg
-
-    def _get_export_path_windows() -> Path:
-        """Resolve the Desktop folder via the Windows Shell Folders registry
-        key, falling back to ~/Desktop when the key is missing.
-        """
-        try:
-            key = _winreg.OpenKey(
-                _winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows"
-                r"\CurrentVersion\Explorer\Shell Folders",
-            )
-            desktop, _ = _winreg.QueryValueEx(key, "Desktop")
-            _winreg.CloseKey(key)
-            return Path(desktop)
-        except OSError:
-            return Path.home() / "Desktop"
+    return _platform_gep()

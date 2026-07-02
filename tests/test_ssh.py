@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.services.ssh import build_ssh_env, close_ssh_sockets
-
-linux_only = pytest.mark.skipif(
-    sys.platform != "linux", reason="requires Linux"
-)
 
 # ───────────────────────────────────────────────────────────| build_ssh_env |──
 
@@ -31,6 +26,7 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(300)
 
@@ -47,6 +43,7 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(300)
 
@@ -63,6 +60,7 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(120)
 
@@ -80,6 +78,7 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(300)
 
@@ -97,9 +96,11 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(300)
-        # BatchMode=no allows FIDO key prompts on first connection
+
+        # BatchMode=no allows auth prompts on first connection
         assert "BatchMode=no" in env["GIT_SSH_COMMAND"]
 
     def test_creates_socket_dir(
@@ -112,27 +113,13 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         sock_dir = tmp_path / "socks"
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", sock_dir)
         build_ssh_env(300)
+
         assert sock_dir.exists()
-
-    @linux_only
-    def test_socket_dir_mode_700(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Socket directory is created with mode 0o700 to prevent other-user
-        access.
-
-        Args:
-            tmp_path (Path): Pytest fixture providing a temporary directory.
-            monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
-                SSH_SOCK_DIR to tmp_path.
-        """
-        sock_dir = tmp_path / "socks"
-        monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", sock_dir)
-        build_ssh_env(300)
-        assert sock_dir.stat().st_mode & 0o777 == 0o700
 
     def test_returns_copy_not_original_environ(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -145,8 +132,10 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(300)
+
         assert env is not os.environ
 
     def test_inherits_existing_env(
@@ -160,8 +149,10 @@ class TestBuildSshEnv:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", tmp_path / "socks")
         env = build_ssh_env(300)
+
         assert "PATH" in env
 
 
@@ -182,9 +173,11 @@ class TestCloseSshSockets:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to point
                 SSH_SOCK_DIR at a path that does not exist.
         """
+
         monkeypatch.setattr(
             "src.services.ssh.SSH_SOCK_DIR", tmp_path / "non-existence"
         )
+
         close_ssh_sockets()  # must not raise
 
     def test_calls_ssh_exit_for_each_socket(
@@ -198,7 +191,9 @@ class TestCloseSshSockets:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         sock_dir = tmp_path / "socks"
+
         sock_dir.mkdir(mode=0o700)
         (sock_dir / "git@github.com:22").touch()
         (sock_dir / "git@gitlab.com:22").touch()
@@ -206,6 +201,7 @@ class TestCloseSshSockets:
 
         with patch("src.services.ssh.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock()
+
             close_ssh_sockets()
 
         assert mock_run.call_count == 2
@@ -221,7 +217,9 @@ class TestCloseSshSockets:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         sock_dir = tmp_path / "socks"
+
         sock_dir.mkdir(mode=0o700)
         (sock_dir / "git@github.com:22").touch()
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", sock_dir)
@@ -246,7 +244,9 @@ class TestCloseSshSockets:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         sock_dir = tmp_path / "socks"
+
         sock_dir.mkdir(mode=0o700)
         (sock_dir / "git@github.com:22").touch()
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", sock_dir)
@@ -268,7 +268,9 @@ class TestCloseSshSockets:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to redirect
                 SSH_SOCK_DIR to tmp_path.
         """
+
         sock_dir = tmp_path / "socks"
+
         sock_dir.mkdir(mode=0o700)
         (sock_dir / "git@github.com:22").touch()
         monkeypatch.setattr("src.services.ssh.SSH_SOCK_DIR", sock_dir)

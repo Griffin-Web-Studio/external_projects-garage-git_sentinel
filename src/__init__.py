@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 import tempfile
 from pathlib import Path
@@ -16,22 +15,14 @@ TMP_DIR = Path(tempfile.gettempdir())
 HOME_DIR = Path.home()
 
 if sys.platform == "win32":
-    APPDATA_DIR = HOME_DIR / "AppData"
+    from src.platform.windows.paths import conf_dir, ssh_sock_dir, state_dir
 
-    _ad = Path(os.environ.get("APPDATA") or (APPDATA_DIR / "Roaming"))
-    _lad = Path(os.environ.get("LOCALAPPDATA") or (APPDATA_DIR / "Local"))
-    CONF_DIR = _ad / APP_NAME
-    STATE_DIR = _lad / APP_NAME
+else:
+    from src.platform.linux.paths import conf_dir, ssh_sock_dir, state_dir
 
-    # Temp dirs on Windows are already per-user, so no UID suffix needed.
-    SSH_SOCK_DIR = TMP_DIR / APP_NAME
-
-if sys.platform == "linux":
-    CONF_DIR = HOME_DIR / ".config" / APP_NAME
-    STATE_DIR = HOME_DIR / ".local" / "share" / APP_NAME
-
-    # UID suffix prevents socket name collisions between users on a shared /tmp.
-    SSH_SOCK_DIR = TMP_DIR / f"{APP_NAME}-{os.getuid()}"
+CONF_DIR = conf_dir(HOME_DIR, APP_NAME)
+STATE_DIR = state_dir(HOME_DIR, APP_NAME)
+SSH_SOCK_DIR = ssh_sock_dir(TMP_DIR, APP_NAME)
 
 CONF_FILE = CONF_DIR / "settings.ini"
 LOCK_FILE = STATE_DIR / "last-run-date"

@@ -59,6 +59,7 @@ def _gate_ssh(
     Returns:
         bool: True if the connection should proceed, False if declined.
     """
+
     host = host_key.split("@")[-1]
 
     if host_key in ssh_declined:
@@ -67,6 +68,7 @@ def _gate_ssh(
             f"(SSH to {host} was declined this session)",
             tag="warning",
         )
+
         return False
 
     if host_key in ssh_approved:
@@ -77,6 +79,7 @@ def _gate_ssh(
     if not app.request_ssh(rurl, short):
         ssh_declined.add(host_key)
         app.log(f"  -> {rname}: skipped by user", tag="warning")
+
         return False
 
     ssh_approved.add(host_key)
@@ -208,6 +211,7 @@ def _scan_repo(
     Returns:
         RepoResult: Fully populated result for this repository.
     """
+
     result = RepoResult(path=repo)
     short = result.short_path()
 
@@ -270,8 +274,10 @@ def _scan_repo(
 
     if parts:
         app.log(f"  !  {'; '.join(parts)}", tag="warning")
+
     else:
         app.log("  OK  clean")
+
     app.log("")
 
     return result
@@ -298,18 +304,22 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
                 " rename it to 'export_path' to silence this warning.",
                 tag="warning",
             )
+
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
 
     export_path = get_export_path(cfg)
     persist_s = cfg.getint("ssh", "control_persist_seconds")
-    use_cm = cfg.getboolean("ssh", "use_control_master")
-    if sys.platform == "win32" and use_cm:
-        app.log(
-            "NOTE: SSH ControlMaster is not supported on Windows"
-            " — using per-connection SSH."
-        )
-        use_cm = False
+
+    if sys.platform == "win32":
+        from src.platform.windows.scan import resolve_control_master
+
+    else:
+        from src.platform.linux.scan import resolve_control_master
+
+    use_cm = resolve_control_master(
+        cfg.getboolean("ssh", "use_control_master"), app.log
+    )
     stale_days = cfg.getint("staleness", "stale_threshold_days")
 
     app.log(f"{APP_NAME}  v{APP_VERSION}", tag="info")
@@ -400,6 +410,7 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
             "\n".join(sorted(curr_keys)), encoding="utf-8"
         )
         app.log(f"Report written -> {report_path}")
+
     else:
         app.log("No issues found - no report generated.")
 
@@ -410,8 +421,10 @@ def scan(app: AppProtocol, cfg: configparser.ConfigParser) -> None:
             tag="warning",
         )
         retention = cfg.getint("reports", "desktop_retention_days")
+
     else:
         retention = cfg.getint("reports", "retention_days")
+
     manage_reports(export_path, retention)
 
     close_ssh_sockets()
