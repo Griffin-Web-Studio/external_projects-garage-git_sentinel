@@ -39,7 +39,8 @@
         "bigonesystems.django",
         "Gruntfuggly.todo-tree",
         "EditorConfig.EditorConfig",
-        "tamasfe.even-better-toml"
+        "tamasfe.even-better-toml",
+        "ryanluker.vscode-coverage-gutters"
       ],
       "settings": {
         "python.testing.pytestArgs": [
