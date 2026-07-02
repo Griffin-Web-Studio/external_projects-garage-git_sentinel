@@ -5,7 +5,7 @@ import sys
 
 from src.config import load_config
 from src.installer import install, is_installed, uninstall
-from src.schedule import should_run_today
+from src.services.schedule import should_run_today
 from .ui.gui.app import GitSentinelApp
 
 from . import APP_NAME

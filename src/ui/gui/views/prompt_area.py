@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from src.git_ops import ssh_host_key
+from src.services.git_ops import ssh_host_key
 from src.models import GateHTTP, GateSSH
 
 # ────────────────────────────────────────────────────────────| Gate prompts |──

@@ -124,7 +124,7 @@ class ScanController(AppProtocol):
             cfg (configparser.ConfigParser): Loaded application configuration.
         """
 
-        from src.scan import scan
+        from src.services.scan import scan
 
         worker = threading.Thread(target=scan, args=(self, cfg), daemon=True)
 

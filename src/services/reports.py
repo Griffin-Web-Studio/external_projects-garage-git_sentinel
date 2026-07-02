@@ -5,8 +5,8 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import APP_NAME, APP_VERSION
-from .models import (
+from src import APP_NAME, APP_VERSION
+from src.models import (
     BranchIssue,
     BranchIssueReason,
     RemoteCheck,

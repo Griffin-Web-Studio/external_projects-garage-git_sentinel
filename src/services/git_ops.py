@@ -7,7 +7,7 @@ from typing import TypedDict
 
 import git
 
-from .models import BranchIssue, BranchIssueReason, TagIssue
+from src.models import BranchIssue, BranchIssueReason, TagIssue
 
 # ──────────────────────────────────────────────────────────| Repo discovery |──
 

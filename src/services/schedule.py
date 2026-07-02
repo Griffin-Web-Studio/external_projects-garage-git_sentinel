@@ -3,7 +3,7 @@ from __future__ import annotations
 import configparser
 from datetime import date
 
-from . import LOCK_FILE, STATE_DIR
+from src import LOCK_FILE, STATE_DIR
 
 # ─────────────────────────────────────────────────────────| Lock / Schedule |──
 

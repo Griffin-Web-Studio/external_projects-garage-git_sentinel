@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 
-from . import SSH_SOCK_DIR
+from src import SSH_SOCK_DIR
 
 # ───────────────────────────────────────────────────────| SSH ControlMaster |──
 

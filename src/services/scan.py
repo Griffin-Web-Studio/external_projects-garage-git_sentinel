@@ -5,9 +5,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import APP_NAME, APP_VERSION
-from .config import get_export_path
-from .git_ops import (
+from src import APP_NAME, APP_VERSION
+from src.config import get_export_path
+from src.services.git_ops import (
     analyse_branches_and_tags,
     check_local_state,
     check_stale,
@@ -19,14 +19,14 @@ from .git_ops import (
     is_ssh_url,
     ssh_host_key,
 )
-from .models import AppProtocol, RemoteCheck, RemoteSkipReason, RepoResult
-from .reports import (
+from src.models import AppProtocol, RemoteCheck, RemoteSkipReason, RepoResult
+from src.services.reports import (
     collect_issue_keys,
     format_report,
     load_previous_issue_keys,
     manage_reports,
 )
-from .ssh import build_ssh_env, close_ssh_sockets
+from src.services.ssh import build_ssh_env, close_ssh_sockets
 
 # ─────────────────────────────────────────────────────────────| Scan worker |──
 
