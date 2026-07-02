@@ -4,9 +4,9 @@ import shutil
 import warnings
 from pathlib import Path
 
-from .. import CONF_DIR, CONF_FILE
-from ..configmigrate import MigrationChain
-from ..configmigrate.ini import IniAdapter
+from src import CONF_DIR, CONF_FILE
+from src.config.migrate import MigrationChain
+from src.config.migrate.ini import IniAdapter
 
 # ──────────────────────────────────────────────────────────────────| Chain |──
 
@@ -34,7 +34,7 @@ def apply_migrations() -> OSError | None:
         OSError | None: The OSError on failure, None on success.
     """
     try:
-        from ..config import get_export_path, load_config
+        from src.config import get_export_path, load_config
 
         # Resolve the pre-migration export path (desktop) before any keys
         # change. Suppress DeprecationWarning that fires when desktop_override
@@ -49,7 +49,7 @@ def apply_migrations() -> OSError | None:
         new_export = get_export_path(load_config())
         _move_legacy_reports(old_export, new_export)
 
-        from ..installer import _render_example_config
+        from src.installer import _render_example_config
 
         (CONF_DIR / "settings.example.ini").write_text(
             _render_example_config(), encoding="utf-8"

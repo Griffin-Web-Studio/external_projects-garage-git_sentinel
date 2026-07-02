@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.migrations import _move_legacy_reports, apply_migrations, chain
+from src.config.migrations import _move_legacy_reports, apply_migrations, chain
 
 # ───────────────────────────────────────────────────────────────────| chain |──
 
@@ -171,8 +171,8 @@ class TestApplyMigrations:
         CONF_DIR.mkdir()
 
         # Point both module namespaces at the temp config / dir.
-        monkeypatch.setattr("src.migrations.CONF_FILE", CONF_FILE)
-        monkeypatch.setattr("src.migrations.CONF_DIR", CONF_DIR)
+        monkeypatch.setattr("src.config.migrations.CONF_FILE", CONF_FILE)
+        monkeypatch.setattr("src.config.migrations.CONF_DIR", CONF_DIR)
         monkeypatch.setattr("src.config.CONF_FILE", CONF_FILE)
 
         # Stub the example-config writer to avoid running the full installer.

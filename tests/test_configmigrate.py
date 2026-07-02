@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from src.configmigrate import MigrationChain
-from src.configmigrate.ini import IniAdapter, _is_active_key, _iter_sections
+from src.config.migrate import MigrationChain
+from src.config.migrate.ini import IniAdapter, _is_active_key, _iter_sections
 
 # ─────────────────────────────────────────────────────────| Shared fixtures |──
 

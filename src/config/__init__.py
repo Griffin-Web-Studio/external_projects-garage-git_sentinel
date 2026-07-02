@@ -5,7 +5,7 @@ import sys
 import warnings
 from pathlib import Path
 
-from . import CONF_FILE
+from src import CONF_FILE
 
 # ──────────────────────────────────────────────────────────────────| Config |──
 

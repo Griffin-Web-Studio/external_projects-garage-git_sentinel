@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.config_template import render_config, wrap_comment
+from src.config.template import render_config, wrap_comment
 from src.models import ConfigEntry, ConfigSection
 
 # ──────────────────────────────────────────────────────────| wrap_comment() |──

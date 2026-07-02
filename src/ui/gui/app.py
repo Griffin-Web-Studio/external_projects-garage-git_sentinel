@@ -9,7 +9,7 @@ from src import APP_NAME, APP_VERSION
 from src.config import load_config
 from src.controllers.events import EventBus
 from src.controllers.scan import ScanController
-from src.migrations import apply_migrations, chain, make_adapter
+from src.config.migrations import apply_migrations, chain, make_adapter
 from src.models import (
     GateHTTP,
     GateSSH,

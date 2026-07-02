@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import APP_NAME, APP_VERSION, CONF_DIR, STATE_DIR
-from .config_template import render_config, wrap_comment
+from src.config.template import render_config, wrap_comment
 from .models import ConfigEntry, ConfigSection
 
 if sys.platform == "win32":

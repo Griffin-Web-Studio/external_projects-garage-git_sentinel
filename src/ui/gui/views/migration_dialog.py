@@ -5,7 +5,7 @@ from tkinter import messagebox
 from typing import Callable
 
 from src import CONF_FILE
-from src.configmigrate import MigrationStep
+from src.config.migrate import MigrationStep
 
 
 def show_migration_dialog(

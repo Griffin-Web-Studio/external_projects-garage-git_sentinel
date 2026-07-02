@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.configmigrate import ConfigAdapter
+    from src.config.migrate import ConfigAdapter
 
 description = (
     "Rename 'desktop_override' to 'export_path' and "

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import ConfigEntry, ConfigSection  # noqa: F401
+from src.models import ConfigEntry, ConfigSection  # noqa: F401
 
 # ────────────────────────────────────────────────────────| Comment wrapping |──
 
