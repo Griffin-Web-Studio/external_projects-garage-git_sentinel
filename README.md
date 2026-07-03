@@ -1,8 +1,7 @@
 <img align="right" width="200" src="src/data/git-sentinel.svg" alt="Project Icon">
 
 > [!NOTE]
-> GitHub users - this project is maintained on GitLab:
-> https://gitlab.com/griffin-web-studio/garage/git-sentinel
+> GitHub users - this project is maintained over [on GitLab](https://gitlab.com/griffin-web-studio/garage/git-sentinel).
 
 [![pipeline status](https://gitlab.com/griffin-web-studio/garage/git-sentinel/badges/main/pipeline.svg)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/pipelines)
 [![coverage: linux](https://img.shields.io/gitlab/pipeline-coverage/griffin-web-studio/garage/git-sentinel?branch=main&job_name=test&label=coverage%3A+linux)](https://gitlab.com/griffin-web-studio/garage/git-sentinel/-/jobs?name=test)
