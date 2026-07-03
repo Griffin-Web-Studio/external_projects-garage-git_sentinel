@@ -23,6 +23,9 @@ automatically once they exceed the configured retention period.
 
 ## Requirements
 
+Please note these are **production** requirements, that is to say requirements
+for the end user system. For the developer requirements please refer to [Dev environment](./CONTRIBUTING.md#dev-environment) section, in the [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 - Any Windows, and Linux desktop (X11 or Wayland)
 - `git` in `PATH`
 
