@@ -8,7 +8,7 @@ from . import APP_NAME, CONF_DIR, STATE_DIR
 from src.config.template import render_config, wrap_comment
 from .models import ConfigEntry, ConfigSection
 
-if sys.platform == "win32":
+if sys.platform == "win32":  # pragma: no cover - Windows only
     from src.platform.windows.installer import BIN_DIR, BINARY_DST
 
 else:
@@ -294,7 +294,7 @@ def _remove_binary() -> None:
 
         return
 
-    if sys.platform == "win32":
+    if sys.platform == "win32":  # pragma: no cover - Windows only
         from src.platform.windows.installer import remove_binary
 
     else:
@@ -340,6 +340,7 @@ def install(*, force: bool = False) -> None:
             f"ERROR: {APP_NAME} supports Linux and Windows only.",
             file=sys.stderr,
         )
+
         sys.exit(1)
 
     print(
@@ -365,7 +366,7 @@ def install(*, force: bool = False) -> None:
             _render_desktop(f"{BINARY_DST} --force", "Categories=Utility;")
         )
 
-    else:
+    elif sys.platform == "win32":  # pragma: no cover - Windows only
         from src.platform.windows.installer import (
             ask_desktop_shortcut,
             install_autostart_windows,
@@ -405,7 +406,7 @@ def uninstall() -> None:
         remove_launcher()
         remove_icon()
 
-    else:
+    elif sys.platform == "win32":  # pragma: no cover - Windows only
         from src.platform.windows.installer import (
             remove_autostart_windows,
             remove_desktop_shortcut,

@@ -59,24 +59,16 @@ install it via the [official installer](https://docs.astral.sh/uv/getting-starte
 
 ## Running tests
 
-**Linux / macOS**
+Same command on every platform - `scripts/test.py` detects the OS and runs
+mypy strict + pytest with the matching coverage config:
 
 ```bash
-# full test suite
-.venv/bin/pytest -q --ignore=tests/platform/windows
-# with coverage
-.venv/bin/pytest --cov=src --cov-config=.coveragerc.linux --cov-report=term-missing -q --ignore=tests/platform/windows
-# type-check
-.venv/bin/mypy --strict src/ git-sentinel.py
+uv run scripts/test.py
 ```
 
-**Windows**
-
-```powershell
-.venv\Scripts\pytest -q --ignore=tests/platform/linux --ignore=tests/unit/ui/gui
-.venv\Scripts\pytest --cov=src --cov-config=.coveragerc.windows --cov-report=term-missing -q --ignore=tests/platform/linux --ignore=tests/unit/ui/gui
-.venv\Scripts\mypy --strict src/ git-sentinel.py
-```
+Extra arguments are forwarded to pytest, e.g. `uv run scripts/test.py -k scan`.
+Use `--no-mypy` to skip the type-check or `--no-cov` to run pytest without
+coverage.
 
 Coverage is tracked separately per platform via `.coveragerc.linux` and
 `.coveragerc.windows`. Linux-only code (`src/platform/linux/`) is excluded

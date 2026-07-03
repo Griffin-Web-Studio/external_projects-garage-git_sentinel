@@ -15,10 +15,11 @@ def _iter_sections(
 ) -> Iterator[tuple[int, str, str | None]]:
     """Yield `(index, line, current_section)` for every line.
 
-    The section name is updated when a header line is encountered, so the
-    header line itself is yielded under the new section name - callers can
-    insert content immediately after it.
+    The section name is updated when a header line is encountered, so the header
+    line itself is yielded under the new section name - callers can insert
+    content immediately after it.
     """
+
     current: str | None = None
 
     for idx, line in enumerate(lines):
@@ -44,6 +45,7 @@ def _is_active_key(line: str, key: str) -> bool:
     Returns:
         bool: True if the line is an active assignment for *key*.
     """
+
     stripped = line.lstrip()
 
     if stripped.startswith((";", "#")):
@@ -75,6 +77,7 @@ class IniAdapter:
             keepends=True
         )
         self._cfg = configparser.ConfigParser()
+
         self._cfg.read(path)
 
     # ── Reading ───────────────────────────────────────────────────────────────
@@ -89,6 +92,7 @@ class IniAdapter:
         Returns:
             bool: True if the key exists and is not commented out.
         """
+
         return self._cfg.has_option(section, key)
 
     def get(self, section: str, key: str) -> str:
@@ -101,6 +105,7 @@ class IniAdapter:
         Returns:
             str: The raw string value.
         """
+
         return self._cfg.get(section, key)
 
     def get_version(self) -> int | None:
@@ -110,8 +115,10 @@ class IniAdapter:
             int | None: The recorded version, or None if no version is stored
                         yet.
         """
+
         try:
             return self._cfg.getint("meta", "version")
+
         except (
             configparser.NoSectionError,
             configparser.NoOptionError,
@@ -131,6 +138,7 @@ class IniAdapter:
             old_key (str): Existing key name.
             new_key (str): Replacement key name.
         """
+
         if not self._cfg.has_option(section, old_key):
             return
 
@@ -147,6 +155,7 @@ class IniAdapter:
                     line,
                     count=1,
                 )
+
                 break
 
         # Phase 2: sync configparser so subsequent has()/get() calls reflect
@@ -155,7 +164,10 @@ class IniAdapter:
         self._cfg.remove_option(section, old_key)
 
         if not self._cfg.has_section(section):
-            self._cfg.add_section(section)
+            # Defensive: has_option() above already implies has_section() is
+            # True for every section except DEFAULT, and configparser itself
+            # forbids re-adding DEFAULT via add_section().
+            self._cfg.add_section(section)  # pragma: no cover
 
         self._cfg.set(section, new_key, value)
 
@@ -170,12 +182,14 @@ class IniAdapter:
             section (str): INI section containing the key.
             key (str): Key name to remove.
         """
+
         if not self._cfg.has_option(section, key):
             return
 
         for idx, line, sec in _iter_sections(self._lines):
             if sec == section and _is_active_key(line, key):
                 self._lines[idx] = "; " + line
+
                 break
 
         self._cfg.remove_option(section, key)
@@ -194,6 +208,7 @@ class IniAdapter:
             dst_section (str): Section to write the value into.
             dst_key (str): Key to receive the value.
         """
+
         if not self.has(src_section, src_key):
             return
 
@@ -215,8 +230,10 @@ class IniAdapter:
             key (str): Key name to set.
             value (str): Value to write.
         """
+
         if self.has(section, key):
             self._overwrite_line(section, key, value)
+
         else:
             self._lines = self._insert_after_section(
                 section, f"{key} = {value}\n"
@@ -233,10 +250,12 @@ class IniAdapter:
         Args:
             version (int): Version integer to record.
         """
+
         self.set_key("meta", "version", str(version))
 
     def save(self) -> None:
         """Persist all in-memory changes back to the file on disk."""
+
         self._path.write_text("".join(self._lines), encoding="utf-8")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -287,6 +306,7 @@ class IniAdapter:
         Returns:
             list[str]: Updated line list.
         """
+
         result: list[str] = []
         inserted = False
 
@@ -297,6 +317,7 @@ class IniAdapter:
                 result.append(line)
                 result.append(new_line)
                 inserted = True
+
                 continue
 
             result.append(line)

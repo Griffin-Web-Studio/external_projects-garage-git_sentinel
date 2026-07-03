@@ -42,12 +42,16 @@ def fake_pkg(
     Yields:
         tuple[str, Path]: (package_name, package_directory) ready to populate.
     """
+
     pkg_name = f"_migtest_{id(tmp_path) & 0xFFFFFFFF:08x}"
     pkg_dir = tmp_path / pkg_name
+
     pkg_dir.mkdir()
     (pkg_dir / "__init__.py").write_text("")
     monkeypatch.syspath_prepend(str(tmp_path))
+
     yield pkg_name, pkg_dir
+
     for key in list(sys.modules):
         if key == pkg_name or key.startswith(f"{pkg_name}."):
             del sys.modules[key]
@@ -61,34 +65,41 @@ class TestIterSections:
 
     def test_section_is_none_before_first_header(self) -> None:
         """Lines before any section header are yielded with section=None."""
+
         lines = ["# top comment\n"]
+
         _, _, sec = list(_iter_sections(lines))[0]
+
         assert sec is None
 
     def test_header_line_yielded_under_its_own_section(self) -> None:
         """The header line itself is already attributed to the new section."""
+
         lines = ["[paths]\n", "key = val\n"]
         result = list(_iter_sections(lines))
+
         assert result[0][2] == "paths"
         assert result[1][2] == "paths"
 
     def test_section_changes_on_new_header(self) -> None:
-        """All lines under a header are attributed to that section until the next.
+        """All lines under a header are attributed to that section until the
+        next."""
 
-        Args:
-        """
         lines = ["[a]\n", "x = 1\n", "[b]\n", "y = 2\n"]
         secs = [sec for _, _, sec in _iter_sections(lines)]
+
         assert secs == ["a", "a", "b", "b"]
 
     def test_indices_are_sequential(self) -> None:
         """Yielded index values match the position in the input list."""
+
         lines = ["[a]\n", "x = 1\n", "y = 2\n"]
         indices = [idx for idx, _, _ in _iter_sections(lines)]
+
         assert indices == [0, 1, 2]
 
 
-# ────────────────────────────────────────────────────────────| _is_active_key |──
+# ──────────────────────────────────────────────────────────| _is_active_key |──
 
 
 class TestIsActiveKey:
@@ -96,22 +107,27 @@ class TestIsActiveKey:
 
     def test_active_assignment_matches(self) -> None:
         """A plain key = value line is active."""
+
         assert _is_active_key("key = value\n", "key") is True
 
     def test_spaces_around_equals_still_match(self) -> None:
         """Extra whitespace around = does not prevent a match."""
+
         assert _is_active_key("key  =  value\n", "key") is True
 
     def test_semicolon_comment_is_inactive(self) -> None:
         """A line starting with ; is not an active key."""
+
         assert _is_active_key("; key = value\n", "key") is False
 
     def test_hash_comment_is_inactive(self) -> None:
         """A line starting with # is not an active key."""
+
         assert _is_active_key("# key = value\n", "key") is False
 
     def test_different_key_does_not_match(self) -> None:
         """A line for a different key does not match the requested key."""
+
         assert _is_active_key("other_key = value\n", "key") is False
 
 
@@ -127,8 +143,11 @@ class TestIniAdapterReading:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
+
         assert IniAdapter(ini).has("paths", "export_path") is True
 
     def test_has_returns_false_for_missing_key(self, tmp_path: Path) -> None:
@@ -137,8 +156,11 @@ class TestIniAdapterReading:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
+
         assert IniAdapter(ini).has("paths", "nonexistent") is False
 
     def test_get_returns_value(self, tmp_path: Path) -> None:
@@ -147,8 +169,11 @@ class TestIniAdapterReading:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
+
         assert IniAdapter(ini).get("paths", "git_root") == "~/git"
 
     def test_get_version_returns_int_when_set(self, tmp_path: Path) -> None:
@@ -157,8 +182,11 @@ class TestIniAdapterReading:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_VERSIONED_INI, encoding="utf-8")
+
         assert IniAdapter(ini).get_version() == 3
 
     def test_get_version_returns_none_when_absent(self, tmp_path: Path) -> None:
@@ -167,8 +195,11 @@ class TestIniAdapterReading:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
+
         assert IniAdapter(ini).get_version() is None
 
 
@@ -181,10 +212,13 @@ class TestIniAdapterRenameKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nold = ~/Desktop\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.rename_key("paths", "old", "new")
+
         assert adapter.has("paths", "new") is True
         assert adapter.get("paths", "new") == "~/Desktop"
 
@@ -194,10 +228,13 @@ class TestIniAdapterRenameKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nold = ~/Desktop\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.rename_key("paths", "old", "new")
+
         assert adapter.has("paths", "old") is False
 
     def test_noop_when_key_absent(self, tmp_path: Path) -> None:
@@ -206,10 +243,13 @@ class TestIniAdapterRenameKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.rename_key("paths", "nonexistent", "new")
+
         assert adapter.has("paths", "new") is False
 
     def test_surrounding_comments_are_preserved(self, tmp_path: Path) -> None:
@@ -218,7 +258,9 @@ class TestIniAdapterRenameKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(
             "[paths]\n# above\nold = val\n# below\n", encoding="utf-8"
         )
@@ -226,6 +268,7 @@ class TestIniAdapterRenameKey:
         adapter.rename_key("paths", "old", "new")
         adapter.save()
         content = ini.read_text(encoding="utf-8")
+
         assert "# above" in content
         assert "# below" in content
 
@@ -239,10 +282,13 @@ class TestIniAdapterRemoveKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nkey = val\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.remove_key("paths", "key")
+
         assert adapter.has("paths", "key") is False
 
     def test_line_is_commented_out_on_disk(self, tmp_path: Path) -> None:
@@ -251,12 +297,15 @@ class TestIniAdapterRemoveKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nkey = val\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.remove_key("paths", "key")
         adapter.save()
         content = ini.read_text(encoding="utf-8")
+
         assert "; key" in content
 
     def test_noop_when_key_absent(self, tmp_path: Path) -> None:
@@ -265,11 +314,14 @@ class TestIniAdapterRemoveKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
         original = ini.read_text(encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.remove_key("paths", "nonexistent")
+
         assert "".join(adapter._lines) == original
 
 
@@ -282,10 +334,13 @@ class TestIniAdapterCarryKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nsrc = old_val\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.carry_key("paths", "src", "paths", "dst")
+
         assert adapter.has("paths", "dst") is True
         assert adapter.get("paths", "dst") == "old_val"
 
@@ -295,10 +350,13 @@ class TestIniAdapterCarryKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nsrc = old_val\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.carry_key("paths", "src", "paths", "dst")
+
         assert adapter.has("paths", "src") is False
 
     def test_does_not_overwrite_existing_dst(self, tmp_path: Path) -> None:
@@ -307,12 +365,15 @@ class TestIniAdapterCarryKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(
             "[paths]\nsrc = from_src\ndst = existing\n", encoding="utf-8"
         )
         adapter = IniAdapter(ini)
         adapter.carry_key("paths", "src", "paths", "dst")
+
         assert adapter.get("paths", "dst") == "existing"
 
     def test_noop_when_src_absent(self, tmp_path: Path) -> None:
@@ -321,10 +382,13 @@ class TestIniAdapterCarryKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.carry_key("paths", "nonexistent", "paths", "dst")
+
         assert adapter.has("paths", "dst") is False
 
 
@@ -337,10 +401,13 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nkey = old\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.set_key("paths", "key", "new")
+
         assert adapter.get("paths", "key") == "new"
 
     def test_inserts_new_key_into_existing_section(
@@ -351,10 +418,13 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nexisting = x\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.set_key("paths", "fresh", "value")
+
         assert adapter.has("paths", "fresh") is True
         assert adapter.get("paths", "fresh") == "value"
 
@@ -364,10 +434,13 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nexisting = x\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.set_key("meta", "version", "5")
+
         assert adapter.has("meta", "version") is True
         assert adapter.get("meta", "version") == "5"
 
@@ -377,10 +450,13 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text(_SIMPLE_INI, encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.set_version(7)
+
         assert adapter.get_version() == 7
 
     def test_save_persists_all_changes_to_disk(self, tmp_path: Path) -> None:
@@ -389,11 +465,14 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nkey = old\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.set_key("paths", "key", "saved")
         adapter.save()
+
         assert "key = saved" in ini.read_text(encoding="utf-8")
 
     def test_rename_key_only_affects_correct_section(
@@ -404,11 +483,14 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         content = "[a]\nkey = from_a\n\n[b]\nkey = from_b\n"
         ini = tmp_path / "s.ini"
+
         ini.write_text(content, encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.rename_key("a", "key", "renamed")
+
         assert adapter.has("a", "renamed") is True
         assert adapter.has("b", "key") is True
 
@@ -420,8 +502,11 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[meta]\nversion = not_a_number\n", encoding="utf-8")
+
         assert IniAdapter(ini).get_version() is None
 
     def test_set_key_new_key_appears_immediately_after_section_header(
@@ -432,13 +517,16 @@ class TestIniAdapterSetKey:
         Args:
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         ini = tmp_path / "s.ini"
+
         ini.write_text("[paths]\nexisting = x\n", encoding="utf-8")
         adapter = IniAdapter(ini)
         adapter.set_key("paths", "fresh", "value")
         adapter.save()
         lines = ini.read_text(encoding="utf-8").splitlines()
         header_idx = next(i for i, ln in enumerate(lines) if "[paths]" in ln)
+
         assert "fresh = value" in lines[header_idx + 1]
 
 
@@ -456,7 +544,9 @@ class TestMigrationChain:
         Args:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "v0001_first.py").write_text(
             'description = "first"\ndef upgrade(cfg): pass\n'
         )
@@ -465,9 +555,30 @@ class TestMigrationChain:
             package_name=pkg_name,
             initial_version=0,
         )
+
         assert 0 in chain._steps
         assert chain._steps[0].to_version == 1
         assert chain._steps[0].description == "first"
+
+    def test_ignores_modules_without_upgrade_fn(
+        self, fake_pkg: tuple[str, Path]
+    ) -> None:
+        """A vNNNN_ module with no upgrade() function is discovered but not
+        registered as a step.
+
+        Args:
+            fake_pkg (tuple[str, Path]): Temporary package name and directory.
+        """
+
+        pkg_name, pkg_dir = fake_pkg
+        (pkg_dir / "v0001_no_upgrade.py").write_text('description = "nope"\n')
+        chain = MigrationChain(
+            package_path=[str(pkg_dir)],
+            package_name=pkg_name,
+            initial_version=0,
+        )
+
+        assert len(chain._steps) == 0
 
     def test_ignores_modules_without_v_prefix(
         self, fake_pkg: tuple[str, Path]
@@ -477,7 +588,9 @@ class TestMigrationChain:
         Args:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "0001_no_prefix.py").write_text(
             'description = "nope"\ndef upgrade(cfg): pass\n'
         )
@@ -486,6 +599,7 @@ class TestMigrationChain:
             package_name=pkg_name,
             initial_version=0,
         )
+
         assert len(chain._steps) == 0
 
     def test_pending_returns_empty_when_version_is_current(
@@ -497,13 +611,16 @@ class TestMigrationChain:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "v0001_first.py").write_text(
             'description = ""\ndef upgrade(cfg): pass\n'
         )
         ini = tmp_path / "s.ini"
         ini.write_text("[meta]\nversion = 1\n", encoding="utf-8")
         chain = MigrationChain([str(pkg_dir)], pkg_name, initial_version=0)
+
         assert chain.pending(IniAdapter(ini)) == []
 
     def test_pending_returns_step_when_behind(
@@ -515,7 +632,9 @@ class TestMigrationChain:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "v0001_first.py").write_text(
             'description = ""\ndef upgrade(cfg): pass\n'
         )
@@ -523,6 +642,7 @@ class TestMigrationChain:
         ini.write_text("[paths]\nkey = val\n", encoding="utf-8")
         chain = MigrationChain([str(pkg_dir)], pkg_name, initial_version=0)
         steps = chain.pending(IniAdapter(ini))
+
         assert len(steps) == 1
         assert steps[0].to_version == 1
 
@@ -535,7 +655,9 @@ class TestMigrationChain:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "v0001_first.py").write_text(
             'description = ""\n'
             'def upgrade(cfg): cfg.set_key("paths", "migrated", "yes")\n'
@@ -545,6 +667,7 @@ class TestMigrationChain:
         chain = MigrationChain([str(pkg_dir)], pkg_name, initial_version=0)
         adapter = IniAdapter(ini)
         chain.apply(adapter)
+
         assert adapter.get_version() == 1
         assert adapter.has("paths", "migrated") is True
 
@@ -557,7 +680,9 @@ class TestMigrationChain:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "v0001_first.py").write_text(
             'description = ""\ndef upgrade(cfg): pass\n'
         )
@@ -565,6 +690,7 @@ class TestMigrationChain:
         ini.write_text("[paths]\nkey = val\n", encoding="utf-8")
         chain = MigrationChain([str(pkg_dir)], pkg_name, initial_version=0)
         chain.apply(IniAdapter(ini))
+
         assert "version = 1" in ini.read_text(encoding="utf-8")
 
     def test_apply_is_noop_when_already_current(
@@ -576,7 +702,9 @@ class TestMigrationChain:
             fake_pkg (tuple[str, Path]): Temporary package name and directory.
             tmp_path (Path): Temporary directory for the INI file.
         """
+
         pkg_name, pkg_dir = fake_pkg
+
         (pkg_dir / "v0001_first.py").write_text(
             'description = ""\n'
             'def upgrade(cfg): cfg.set_key("paths", "should_not_appear", "1")\n'
@@ -588,4 +716,5 @@ class TestMigrationChain:
         chain = MigrationChain([str(pkg_dir)], pkg_name, initial_version=0)
         adapter = IniAdapter(ini)
         chain.apply(adapter)
+
         assert adapter.has("paths", "should_not_appear") is False

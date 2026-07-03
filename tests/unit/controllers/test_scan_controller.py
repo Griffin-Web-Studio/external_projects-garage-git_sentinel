@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import configparser
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -268,3 +270,93 @@ class TestRequestHTTPRetry:
             )
             is False
         )
+
+
+# ──────────────────────────────────────────────────────────────| start_scan |──
+
+
+class TestStartScan:
+    """start_scan() runs the scan worker on a background daemon thread."""
+
+    @pytest.fixture
+    def spawned(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> list[threading.Thread]:
+        """Capture every thread started via src.controllers.scan.threading.
+
+        Args:
+            monkeypatch (pytest.MonkeyPatch): Wraps threading.Thread so each
+                created instance is recorded before being returned as-is.
+
+        Returns:
+            list[threading.Thread]: Threads created by start_scan, appended
+                to as they are constructed.
+        """
+
+        threads: list[threading.Thread] = []
+        real_thread = threading.Thread
+
+        def spy_thread(*args: object, **kwargs: object) -> threading.Thread:
+            t = real_thread(*args, **kwargs)  # type: ignore[arg-type]
+            threads.append(t)
+            return t
+
+        monkeypatch.setattr("src.controllers.scan.threading.Thread", spy_thread)
+
+        return threads
+
+    def test_spawns_daemon_thread(
+        self,
+        ctrl: ScanController,
+        spawned: list[threading.Thread],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The worker thread created by start_scan is marked daemon.
+
+        Args:
+            ctrl (ScanController): Controller under test.
+            spawned (list[threading.Thread]): Threads captured by the
+                spawned fixture.
+            monkeypatch (pytest.MonkeyPatch): Stubs out the real scan
+                worker so no filesystem/git access happens.
+        """
+
+        monkeypatch.setattr("src.services.scan.scan", lambda app, cfg: None)
+
+        ctrl.start_scan(configparser.ConfigParser())
+
+        assert len(spawned) == 1
+        assert spawned[0].daemon is True
+
+        spawned[0].join(timeout=2)
+
+    def test_worker_calls_scan_with_controller_and_cfg(
+        self,
+        ctrl: ScanController,
+        spawned: list[threading.Thread],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The background worker invokes scan(self, cfg) with the exact
+        controller and config passed to start_scan.
+
+        Args:
+            ctrl (ScanController): Controller under test.
+            spawned (list[threading.Thread]): Threads captured by the
+                spawned fixture.
+            monkeypatch (pytest.MonkeyPatch): Replaces scan() with a
+                recording stub.
+        """
+
+        calls: list[tuple[object, object]] = []
+
+        def fake_scan(app: object, cfg: object) -> None:
+            calls.append((app, cfg))
+
+        monkeypatch.setattr("src.services.scan.scan", fake_scan)
+
+        cfg = configparser.ConfigParser()
+        ctrl.start_scan(cfg)
+
+        spawned[0].join(timeout=2)
+
+        assert calls == [(ctrl, cfg)]

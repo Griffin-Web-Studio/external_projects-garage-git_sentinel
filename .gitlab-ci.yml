@@ -122,9 +122,7 @@ test:
     - pip install uv --quiet
   script:
     - uv sync --frozen --group dev
-    - uv run mypy --strict src/ git-sentinel
-    - xvfb-run --auto-servernum uv run pytest -q --ignore=tests/platform/windows
-        --cov=src --cov-config=.coveragerc.linux --cov-report=term-missing
+    - uv run scripts/test.py
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
 # Uses Windows runner.
@@ -140,9 +138,7 @@ test:windows:
     - pip install uv --quiet
   script:
     - uv sync --frozen --group dev
-    - uv run mypy --strict src/ git-sentinel
-    - uv run pytest -q --ignore=tests/platform/linux --ignore=tests/unit/ui/gui
-        --cov=src --cov-config=.coveragerc.windows --cov-report=term-missing
+    - uv run scripts/test.py
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
 # ───────────────────────────────────────────────────| Shared build template |──

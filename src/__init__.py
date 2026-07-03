@@ -14,7 +14,7 @@ APP_NAME = "git-sentinel"
 TMP_DIR = Path(tempfile.gettempdir())
 HOME_DIR = Path.home()
 
-if sys.platform == "win32":
+if sys.platform == "win32":  # pragma: no cover - Windows only
     from src.platform.windows.paths import conf_dir, ssh_sock_dir, state_dir
 
 else:

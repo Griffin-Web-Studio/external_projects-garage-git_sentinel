@@ -26,9 +26,11 @@ def _fmt_branch_issue(bi: BranchIssue) -> str:
     Returns:
         str: A four-space-indented description of the issue.
     """
+
     if bi.reason == BranchIssueReason.NOT_IN_ORIGIN:
         return f"    {bi.branch} → not in origin ({bi.commits} commit(s))"
-    if bi.reason in (
+
+    elif bi.reason in (
         BranchIssueReason.AHEAD_OF_ORIGIN,
         BranchIssueReason.AHEAD_OF_REMOTE,
     ):
@@ -36,9 +38,12 @@ def _fmt_branch_issue(bi: BranchIssue) -> str:
             f"    {bi.branch} → {bi.remote or '?'} (+{bi.ahead} unpushed "
             "commit(s))"
         )
-    if bi.reason == BranchIssueReason.NOT_IN_ANY_REMOTE:
+
+    elif bi.reason == BranchIssueReason.NOT_IN_ANY_REMOTE:
         return f"    {bi.branch} → not in any remote ({bi.commits} commit(s))"
-    return f"    {bi.branch} → {bi.remote or '?'} ({bi.reason.value})"
+
+    else:  # pragma: no cover - defensive; all reasons handled above
+        return f"    {bi.branch} → {bi.remote or '?'} ({bi.reason.value})"
 
 
 def _fmt_skip_reason(rc: RemoteCheck) -> str:
@@ -51,11 +56,15 @@ def _fmt_skip_reason(rc: RemoteCheck) -> str:
         str: Human-readable skip reason, including the error detail for
             FETCH_FAILED entries.
     """
+
     reason = rc.skip_reason
+
     if reason is None:
         return ""
+
     if reason == RemoteSkipReason.FETCH_FAILED and rc.skip_error:
         return f"fetch_failed: {rc.skip_error}"
+
     return reason.value
 
 
@@ -68,13 +77,16 @@ def _fmt_stale_entry(r: RepoResult) -> str:
     Returns:
         str: Two-space-indented repo path followed by last-commit information.
     """
+
     if r.last_commit_date:
         days = (datetime.now() - r.last_commit_date).days
+
         return (
             f"  {r.short_path()}"
             f"  (last commit: {r.last_commit_date.strftime('%Y-%m-%d')}"
             f", {days} day(s) ago)"
         )
+
     return f"  {r.short_path()}  (no commits found)"
 
 
@@ -91,11 +103,15 @@ def collect_issue_keys(results: list[RepoResult]) -> set[str]:
     Returns:
         set[str]: Canonical issue keys for this run.
     """
+
     keys: set[str] = set()
+
     for r in results:
         sp = r.short_path()
+
         if not r.has_remote:
             keys.add(f"{sp}|no_remote")
+
         keys.update(f"{sp}|uncommitted|{f}" for f in r.uncommitted)
         keys.update(f"{sp}|untracked|{f}" for f in r.untracked)
         keys.update(f"{sp}|stash|{s}" for s in r.stashes)
@@ -104,6 +120,7 @@ def collect_issue_keys(results: list[RepoResult]) -> set[str]:
             for bi in r.branch_issues
         )
         keys.update(f"{sp}|tag|{ti.tag}|{ti.remote}" for ti in r.tag_issues)
+
     return keys
 
 
@@ -117,13 +134,17 @@ def load_previous_issue_keys(export_path: Path) -> set[str]:
         set[str]: Issue keys from the previous run, or an empty set if no
             prior report exists or the file cannot be read.
     """
+
     candidates = sorted(
         export_path.glob("*-git-status-report.issues"), reverse=True
     )
+
     if not candidates:
         return set()
+
     try:
         return set(candidates[0].read_text(encoding="utf-8").splitlines())
+
     except OSError:
         return set()
 
@@ -152,6 +173,7 @@ def format_report(
     Returns:
         str: The complete report text ready to write to a .log file.
     """
+
     stale_days = cfg.getint("staleness", "stale_threshold_days")
     issues_list = [r for r in results if r.has_issues()]
     stale_list = [r for r in results if r.is_stale]
@@ -188,6 +210,7 @@ def format_report(
         blank()
 
     no_remote = [r for r in results if not r.has_remote]
+
     if no_remote:
         sec("no_remote")
         L.append(
@@ -198,6 +221,7 @@ def format_report(
         blank()
 
     uncommitted_repos = [r for r in results if r.uncommitted]
+
     if uncommitted_repos:
         sec("uncommitted")
         L.append("; Staged or modified tracked files not yet committed")
@@ -212,6 +236,7 @@ def format_report(
         blank()
 
     untracked_repos = [r for r in results if r.untracked]
+
     if untracked_repos:
         sec("untracked")
         L.append("; Non-ignored files not yet added and committed")
@@ -226,6 +251,7 @@ def format_report(
         blank()
 
     stash_repos = [r for r in results if r.stashes]
+
     if stash_repos:
         sec("stashes")
         L.extend(
@@ -239,6 +265,7 @@ def format_report(
         blank()
 
     branch_repos = [r for r in results if r.branch_issues]
+
     if branch_repos:
         sec("unpushed_branches")
         L.extend(
@@ -252,6 +279,7 @@ def format_report(
         blank()
 
     tag_repos = [r for r in results if r.tag_issues]
+
     if tag_repos:
         sec("unpushed_tags")
         L.extend(
@@ -270,6 +298,7 @@ def format_report(
     skipped = [
         (r, rc) for r in results for rc in r.remote_checks if rc.skip_reason
     ]
+
     if skipped:
         sec("remote_checks_skipped")
         L.append(
@@ -309,6 +338,7 @@ def manage_reports(export_path: Path, retention_days: int) -> None:
         export_path (Path): Directory where reports are written.
         retention_days (int): Reports older than this many days are deleted.
     """
+
     export_path.mkdir(parents=True, exist_ok=True)
     cutoff = date.today() - timedelta(days=retention_days)
 
@@ -319,8 +349,10 @@ def manage_reports(export_path: Path, retention_days: int) -> None:
                 int(report.name[4:6]),
                 int(report.name[6:8]),
             )
+
         except ValueError:
             continue
+
         if report_date < cutoff:
             report.unlink(missing_ok=True)
             report.with_suffix(".issues").unlink(missing_ok=True)

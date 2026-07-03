@@ -85,7 +85,7 @@ def get_export_path(cfg: configparser.ConfigParser) -> Path:
     except configparser.NoOptionError, configparser.NoSectionError:
         pass
 
-    if sys.platform == "win32":
+    if sys.platform == "win32":  # pragma: no cover - Windows only
         from src.platform.windows.config import get_export_path as _platform_gep
 
     else:
