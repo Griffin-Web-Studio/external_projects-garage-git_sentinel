@@ -150,18 +150,32 @@ cz bump --increment PATCH
 
 ## CI pipeline
 
-| Stage   | Job                | Trigger           | What it does                                      |
-|---------|--------------------|-------------------|---------------------------------------------------|
-| test    | `test`             | all pipelines     | mypy strict + pytest (75 % coverage gate)         |
-| build   | `build`            | commit / MR / tag | PyInstaller binary to `dist/git-sentinel`          |
-| build   | `build:nightly`    | schedule          | PyInstaller binary (rolling nightly build)        |
-| publish | `publish:release`  | versioned tag     | Uploads binary to Generic Package Registry        |
-| publish | `publish:nightly`  | schedule          | Overwrites the rolling `nightly` package entry    |
-| release | `release`          | versioned tag     | Creates a GitLab Release with binary asset linked |
+| Stage   | Job              | Trigger           | What it does                                      |
+|---------|------------------|-------------------|----------------------------------------------------|
+| `.pre`  | `check:nightly`  | schedule          | Skips the rest of the nightly jobs if main hasn't moved since the last nightly build |
+| test    | `test`           | all pipelines     | mypy strict + pytest (75 % coverage gate)         |
+| build   | `build`          | commit / MR / tag | PyInstaller binary to `dist/git-sentinel`          |
+| build   | `build:nightly`  | schedule          | PyInstaller binary (rolling nightly build)        |
+| publish | `publish:release`| versioned tag     | Uploads binary to Generic Package Registry        |
+| publish | `publish:nightly`| schedule          | Overwrites the rolling `nightly` package entry    |
+| release | `release`        | versioned tag     | Creates a GitLab Release with binary asset linked |
 
 Scheduled pipelines (set up under CI/CD to Schedules in GitLab) produce a rolling
 nightly build uploaded under the fixed version `nightly` - the download URL never
 changes.
+
+`check:nightly` compares the current commit against the SHA recorded by the
+last successful nightly publish (`nightly-sha.txt` in the same package). If
+they match, `build:nightly`/`build:windows:nightly`/`publish:nightly`/
+`publish:windows:nightly` all skip themselves, so a schedule firing on an
+unchanged `main` doesn't produce a duplicate build. `test`/`test:windows`
+still run regardless, as a nightly health check on `main`.
+
+Nightly binaries report a distinct version in the app window title and
+generated reports - `git-sentinel v0.2.0-nightly.<short SHA>` - so a build can
+be traced back to the exact commit it came from. `scripts/patch_nightly_version.py`
+applies this suffix to `APP_VERSION` before PyInstaller runs; it only mutates
+the CI job's checked-out worktree and is never committed.
 
 ### Tag format
 

@@ -2,6 +2,8 @@
 #
 # STAGES
 #
+#   - .pre       (implicit) checks whether main has moved since the last
+#                 nightly build
 #   - test       mypy strict + pytest (runs on every pipeline)
 #   - build      compile the PyInstaller binary
 #   - publish    upload the binary to the Generic Package Registry
@@ -21,9 +23,17 @@
 #     -> release
 #
 #   Scheduled pipeline (main):
-#     -> test       (Linux + Windows)
-#     -> build      (Linux + Windows)
-#     -> publish    (nightly, rolling, Linux + Windows)
+#     -> check:nightly  compares $CI_COMMIT_SHA against the SHA recorded by
+#                        the last successful nightly publish. If unchanged,
+#                        every job below is skipped - a schedule firing on an
+#                        unchanged main produces nothing.
+#     -> test           (Linux + Windows) - always runs, regardless of
+#                        check:nightly, as a nightly health check on main
+#     -> build          (Linux + Windows) - APP_VERSION is suffixed with
+#                        "-nightly.<short SHA>" before PyInstaller runs, so
+#                        the binary reports e.g. "git-sentinel v0.2.0-nightly.a1b2c3d"
+#     -> publish        (nightly, rolling, Linux + Windows) - also records
+#                        $CI_COMMIT_SHA as the new "last nightly" marker
 #
 #
 # COMMIT TYPE FILTER
@@ -64,6 +74,13 @@
 #   Nightly download URLs (once a schedule has run):
 #   - $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/git-sentinel/nightly/git-sentinel
 #   - $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/git-sentinel/nightly/git-sentinel.exe
+#
+#   Change detection: check:nightly downloads
+#   .../packages/generic/git-sentinel/nightly/nightly-sha.txt (the commit SHA
+#   recorded by the last successful nightly publish) and compares it to
+#   $CI_COMMIT_SHA. A match means main hasn't moved since the last nightly, so
+#   build/publish are skipped via the $NIGHTLY_SKIP dotenv variable. No file
+#   yet (first-ever run) is treated as "always build".
 
 # ──────────────────────────────────────────────────────────| Workflow Setup |──
 #
@@ -110,6 +127,37 @@ stages:
 variables:
   BINARY:  git-sentinel
   PACKAGE: git-sentinel
+
+# ───────────────────────────────────────────────────────| Nightly change gate |──
+#
+# Runs before everything else on a scheduled pipeline. Compares the current
+# commit against the SHA recorded by the last successful nightly publish; if
+# they match, main hasn't moved and there's nothing new to ship, so
+# build:nightly/build:windows:nightly/publish:nightly/publish:windows:nightly
+# all skip themselves via the $NIGHTLY_SKIP dotenv variable produced here.
+check:nightly:
+  stage: .pre
+  image: curlimages/curl:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - |
+      rm -f nightly-sha.txt
+      curl --fail --silent --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           -o nightly-sha.txt \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/nightly/nightly-sha.txt" \
+           || true
+      LAST_SHA="$(cat nightly-sha.txt 2>/dev/null || echo "")"
+      if [ "$LAST_SHA" = "$CI_COMMIT_SHA" ]; then
+        echo "No new commits since last nightly build ($LAST_SHA) - skipping."
+        echo "NIGHTLY_SKIP=true" >> nightly.env
+      else
+        echo "New commits since last nightly build - proceeding."
+        echo "NIGHTLY_SKIP=false" >> nightly.env
+      fi
+  artifacts:
+    reports:
+      dotenv: nightly.env
 
 # ────────────────────────────────────────────────────────────────────| Test |──
 #
@@ -201,20 +249,36 @@ build:windows:
       # otherwise always
     - when: always
 
-# Nightly Builds; Linux build
+# Nightly Builds; Linux build.
+# Suffixes APP_VERSION with "-nightly.<short SHA>" before PyInstaller runs so
+# the compiled binary reports e.g. "git-sentinel v0.2.0-nightly.a1b2c3d" - this
+# only mutates the CI job's worktree, never committed anywhere.
 build:nightly:
   extends: .build
+  before_script:
+    - !reference [.build, before_script]
+    - python3 scripts/patch_nightly_version.py "$CI_COMMIT_SHORT_SHA"
+  needs: [check:nightly, test, test:windows]
   artifacts:
     expire_in: 3 days
   rules:
+    - if: $NIGHTLY_SKIP == "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
-# Nightly Builds; Windows build
+# Nightly Builds; Windows build. See build:nightly above for the version
+# suffixing rationale.
 build:windows:nightly:
   extends: build:windows
+  before_script:
+    - !reference [build:windows, before_script]
+    - python scripts/patch_nightly_version.py "$CI_COMMIT_SHORT_SHA"
+  needs: [check:nightly, test, test:windows]
   artifacts:
     expire_in: 3 days
   rules:
+    - if: $NIGHTLY_SKIP == "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: always
 
@@ -250,22 +314,36 @@ publish:windows:release:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
 
-# Overwrites the single "nightly" entry on every scheduled run.
+# Overwrites the single "nightly" entry on every scheduled run. Also records
+# $CI_COMMIT_SHA as nightly-sha.txt so the next scheduled run's check:nightly
+# can detect whether main has moved since this build.
 publish:nightly:
   extends: .publish
-  needs: [build:nightly]
+  needs: [check:nightly, build:nightly]
   variables:
     PACKAGE_VERSION: nightly
   rules:
+    - if: $NIGHTLY_SKIP == "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - !reference [.publish, script]
+    - |
+      echo -n "$CI_COMMIT_SHA" > nightly-sha.txt
+      curl --fail --silent --show-error \
+           --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file nightly-sha.txt \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/nightly/nightly-sha.txt"
 
 publish:windows:nightly:
   extends: .publish
-  needs: [build:windows:nightly]
+  needs: [check:nightly, build:windows:nightly]
   variables:
     PACKAGE_VERSION: nightly
     BINARY: git-sentinel.exe
   rules:
+    - if: $NIGHTLY_SKIP == "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
 # ─────────────────────────────────────────────────────────────────| Release |──
