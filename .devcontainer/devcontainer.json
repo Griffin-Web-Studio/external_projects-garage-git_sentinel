@@ -39,14 +39,12 @@
         "bigonesystems.django",
         "Gruntfuggly.todo-tree",
         "EditorConfig.EditorConfig",
-        "tamasfe.even-better-toml",
-        "ryanluker.vscode-coverage-gutters"
+        "tamasfe.even-better-toml"
       ],
       "settings": {
         "python.testing.pytestArgs": [
           "tests",
-          "--cov=src",
-          "--cov-report=lcov"
+          "--cov=src"
         ],
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
