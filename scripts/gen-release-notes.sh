@@ -6,25 +6,10 @@ set -eu
 TAG=$1
 CHANNEL=$2
 
-cat <<EOF
-## git-sentinel $TAG
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+TEMPLATE="$SCRIPT_DIR/.gitlab/release_notes_templates/default.md"
 
-**Channel:** $CHANNEL
-
-### Install
-
-**Linux**
-\`\`\`bash
-chmod +x git-sentinel
-./git-sentinel
-\`\`\`
-
-**Windows** - download \`git-sentinel.exe\` and run it from PowerShell or Command Prompt:
-\`\`\`powershell
-.\git-sentinel.exe
-\`\`\`
-
-On first run the binary detects it is not installed and sets itself up automatically.
-To force a reinstall or update: \`git-sentinel --install\`
-To uninstall: \`git-sentinel --uninstall\`
-EOF
+sed \
+  -e "s|{{TAG}}|$TAG|g" \
+  -e "s|{{CHANNEL}}|$CHANNEL|g" \
+  "$TEMPLATE"
