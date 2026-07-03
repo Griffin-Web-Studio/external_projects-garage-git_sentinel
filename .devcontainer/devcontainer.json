@@ -44,7 +44,9 @@
       "settings": {
         "python.testing.pytestArgs": [
           "tests",
-          "--cov=src"
+          "--ignore=tests/platform/windows",
+          "--cov=src",
+          "--cov-config=.coveragerc.linux"
         ],
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
