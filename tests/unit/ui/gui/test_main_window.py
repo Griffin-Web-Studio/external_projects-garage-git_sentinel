@@ -368,6 +368,45 @@ class TestHandleFinishWithIssues:
 
         assert "3" in window._status_var.get()
 
+    def test_status_shows_tilde_shortened_report_dir(
+        self,
+        window: MainWindow,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Status label shows the report's parent directory, tilde-shortened
+        relative to home, instead of a hardcoded 'Desktop'.
+
+        Args:
+            window (MainWindow): Main application frame containing all
+                                 persistent UI elements.
+            monkeypatch (pytest.MonkeyPatch): Redirects Path.home() to
+                tmp_path so the report path resolves under it.
+            tmp_path (Path): Stand-in home directory.
+        """
+
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        report = tmp_path / "git" / "reports" / "report.log"
+
+        window.handle_finish(MsgFinish(issue_count=1, report_path=report))
+
+        assert "~/git/reports" in window._status_var.get()
+        assert "Desktop" not in window._status_var.get()
+
+    def test_status_omits_location_when_report_path_none(
+        self, window: MainWindow
+    ) -> None:
+        """Status label doesn't claim a location when report_path is None.
+
+        Args:
+            window (MainWindow): Main application frame containing all
+                                 persistent UI elements.
+        """
+
+        window.handle_finish(MsgFinish(issue_count=1, report_path=None))
+
+        assert "Desktop" not in window._status_var.get()
+
     def test_report_exists_adds_open_button(
         self, window: MainWindow, tmp_path: Path
     ) -> None:
