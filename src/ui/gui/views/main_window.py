@@ -195,9 +195,23 @@ class MainWindow(tk.Frame):
             self._close_btn.config(text="Close", state="normal")
 
         else:
+            location = ""
+
+            if msg.report_path:
+                try:
+                    location = (
+                        " ~/"
+                        + msg.report_path.parent.relative_to(
+                            Path.home()
+                        ).as_posix()
+                    )
+
+                except ValueError:
+                    location = f" {msg.report_path.parent}"
+
             self._status_var.set(
                 f"⚠️  {msg.issue_count} repo(s) with issues"
-                f" - report saved to Desktop."
+                f" - report saved to{location}."
             )
 
             if msg.report_path and msg.report_path.exists():
