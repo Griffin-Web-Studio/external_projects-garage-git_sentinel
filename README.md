@@ -18,8 +18,9 @@ On each login it scans every git repository under `~/git/` (or your preferred
 location) and reports anything that could be lost in a storage failure:
 uncommitted changes, untracked files, stashes, unpushed branches, unpushed
 tags, and repositories with no remote configured. Results are written as a
-dated report to your Desktop - annoying on purpose! If nothing is wrong, no
-report is created and any previous reports are moved to an archive.
+dated report to `~/git/reports/` by default (configurable via `export_path`).
+If nothing is wrong, no report is created. Old reports are pruned
+automatically once they exceed the configured retention period.
 
 ## Requirements
 
@@ -63,17 +64,19 @@ After installation, the next login opens a small desktop window:
 - For **SSH remotes**, a prompt appears asking whether to approve an SSH
   connection to that host. Approving once per host is enough for the session -
   subsequent remotes on the same host reuse an SSH ControlMaster socket so you
-  are not prompted (or asked for your FIDO key) again.
+  are not prompted (or asked to authenticate) again. *(Linux only - see the
+  `[ssh]` note below.)*
 
 When the scan finishes:
 
 | Result | Status message | Button |
 |--------|---------------|--------|
-| Issues found | ⚠️ N repo(s) with issues - report saved to Desktop | Acknowledge & Close + Open Report |
+| Issues found | ⚠️ N repo(s) with issues - report saved to \<export_path\> | Acknowledge & Close + Open Report |
 | All clear | ✔️ All clear - no issues found. | Close |
 
-On a clean run, any existing reports on the Desktop are moved to the archive
-automatically, so the Desktop stays empty - the visual signal that all is well.
+On a clean run, no new report is written - only the "All clear" status message
+is shown. Reports already in `export_path` older than `retention_days` are
+still pruned automatically, regardless of whether today's run found issues.
 
 If `once_per_day` is enabled (the default), subsequent logins on the same
 calendar day exit silently without opening a window.
@@ -91,7 +94,7 @@ All path values are relative to your home directory unless they begin with `/`.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `git_root` | `git` | Root directory scanned recursively for git repositories (`~/git/`) |
-| `export_path` | *(unset)* | Directory where reports are written. Leave unset to use `XDG_DESKTOP_DIR`. *(Replaces deprecated `desktop_override`)* |
+| `export_path` | `git/reports` | Directory where reports are written. Comment out or empty this key to fall back to `XDG_DESKTOP_DIR` (or `~/Desktop`) instead. *(Replaces deprecated `desktop_override`)* |
 | ~~`reports_archive`~~ | - | **Deprecated** - no longer used. Carry any custom value over to `export_path`. |
 
 ### `[reports]`
@@ -117,8 +120,12 @@ All path values are relative to your home directory unless they begin with `/`.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `use_control_master` | `true` | Multiplex SSH so each host needs only one FIDO key tap per session |
+| `use_control_master` | `true` | Multiplex SSH so each host needs only one authentication per session |
 | `control_persist_seconds` | `300` | How long (seconds) to keep an idle ControlMaster socket alive |
+
+> [!NOTE]
+> SSH ControlMaster multiplexing is a Linux-only feature. On Windows both
+> keys above have no effect and every remote check authenticates separately.
 
 ## How it works
 
@@ -146,8 +153,9 @@ HTTP remotes that fail offer a one-time retry prompt.
 
 Compares today's findings against the previous report to split issues into
 `[persistent_issues]` (seen before) and `[new_issues]` (first occurrence).
-Writes the report to the Desktop if any issues are found, or moves all Desktop
-reports to the archive if the run is clean.
+Writes the report to `export_path` if any issues are found; otherwise nothing
+is written. Either way, reports in `export_path` older than `retention_days`
+are pruned.
 
 ### Fork/upstream repos
 
@@ -223,9 +231,8 @@ issue keys used to classify findings as new or persistent on the next run.
 | `~/.local/share/applications/git-sentinel.desktop` | App launcher entry |
 | `~/.local/share/icons/hicolor/scalable/apps/git-sentinel.svg` | App icon |
 | `~/.local/share/git-sentinel/` | State directory (daily lock file) |
-| `~/Desktop/*-git-status-report.log` | Current reports |
-| `~/Desktop/*-git-status-report.issues` | Issue key sidecars |
-| `~/git/reports/` | Report archive |
+| `~/git/reports/*-git-status-report.log` | Reports (default `export_path`) |
+| `~/git/reports/*-git-status-report.issues` | Issue key sidecars |
 
 ## Uninstalling
 
@@ -234,8 +241,7 @@ git-sentinel --uninstall
 ```
 
 You will be asked whether to also remove `~/.config/git-sentinel/` and the
-state directory. Reports on the Desktop and in `~/git/reports/` are always left
-in place.
+state directory. Reports in `export_path` are always left in place.
 
 ## Development
 
