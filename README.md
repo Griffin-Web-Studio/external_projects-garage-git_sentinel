@@ -124,8 +124,8 @@ All path values are relative to your home directory unless they begin with `/`.
 | `control_persist_seconds` | `300` | How long (seconds) to keep an idle ControlMaster socket alive |
 
 > [!NOTE]
-> SSH ControlMaster multiplexing is a Linux-only feature. On Windows both
-> keys above have no effect and every remote check authenticates separately.
+> SSH ControlMaster multiplexing is a Linux-only feature as [Windows doesn't support it yet](https://github.com/PowerShell/Win32-OpenSSH/issues/1328).
+> On Windows both keys above have no effect and every remote check authenticates separately.
 
 ## How it works
 
