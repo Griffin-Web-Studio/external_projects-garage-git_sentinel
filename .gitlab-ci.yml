@@ -284,7 +284,6 @@ build:windows:nightly:
     expire_in: 3 days
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: always
 
 # ─────────────────────────────────────────────────| Shared publish template |──
 
