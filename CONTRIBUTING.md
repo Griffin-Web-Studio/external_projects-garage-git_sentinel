@@ -55,30 +55,28 @@ pre-commit install --hook-type commit-msg
 
 `scripts/setup.ps1` automates the above steps. If you don't have `uv` yet,
 install it via the [official installer](https://docs.astral.sh/uv/getting-started/installation/)
-(the recommended path on Windows — no `pipx` required).
+(the recommended path on Windows - no `pipx` required).
 
 ## Running tests
 
-**Linux / macOS**
+Same command on every platform - `scripts/test.py` detects the OS and runs
+mypy strict + pytest with the matching coverage config:
 
 ```bash
-.venv/bin/pytest -q                                        # full test suite
-.venv/bin/pytest --cov=src --cov-report=term-missing -q   # with coverage
-.venv/bin/mypy --strict src/ git-sentinel.py               # type-check
+uv run scripts/test.py
 ```
 
-**Windows**
+Extra arguments are forwarded to pytest, e.g. `uv run scripts/test.py -k scan`.
+Use `--no-mypy` to skip the type-check or `--no-cov` to run pytest without
+coverage.
 
-```powershell
-.venv\Scripts\pytest -q
-.venv\Scripts\pytest --cov=src --cov-report=term-missing -q
-.venv\Scripts\mypy --strict src/ git-sentinel.py
-```
-
-The test suite covers all non-GUI modules (225 tests, ~78 % overall). GUI layout
-code is excluded by design - all logic-bearing code (queues, gate protocol, scan
-pipeline, report generation, git ops) is fully covered. The CI pipeline enforces
-a 75 % coverage floor and mypy strict on every push.
+Coverage is tracked separately per platform via `.coveragerc.linux` and
+`.coveragerc.windows`. Linux-only code (`src/platform/linux/`) is excluded
+from the Windows coverage run and vice versa. GUI tests only run on Linux -
+Tkinter under `uv`'s venv on Windows intermittently fails to find `tk`, so
+`src/ui/gui/` is excluded from the Windows coverage run entirely rather than
+run flaky. The CI pipeline enforces a 75 % coverage floor (per platform) and
+mypy strict on every push.
 
 ## Commit messages
 
@@ -123,8 +121,8 @@ git push origin main --follow-tags
 ```
 
 `cz bump` will:
-1. Determine the next version from commits (`feat` → minor, `fix`/`perf` → patch,
-   `BREAKING CHANGE` → major)
+1. Determine the next version from commits (`feat` to minor, `fix`/`perf` to patch,
+   `BREAKING CHANGE` to major)
 2. Update `version` in `pyproject.toml` and `APP_VERSION` in `src/__init__.py`
 3. Prepend an entry to `CHANGELOG.md`
 4. Commit and tag as `vX.Y.Z`
@@ -134,11 +132,11 @@ git push origin main --follow-tags
 Accepted pre-release types: `alpha`, `beta`, `rc`.
 
 ```bash
-cz bump --prerelease alpha   # → v1.0.0-alpha.0
-cz bump --prerelease alpha   # → v1.0.0-alpha.1  (subsequent alpha)
-cz bump --prerelease beta    # → v1.0.0-beta.0
-cz bump --prerelease rc      # → v1.0.0-rc.0
-cz bump                      # → v1.0.0           (promote to stable)
+cz bump --prerelease alpha   # to v1.0.0-alpha.0
+cz bump --prerelease alpha   # to v1.0.0-alpha.1  (subsequent alpha)
+cz bump --prerelease beta    # to v1.0.0-beta.0
+cz bump --prerelease rc      # to v1.0.0-rc.0
+cz bump                      # to v1.0.0           (promote to stable)
 git push origin main --follow-tags
 ```
 
@@ -155,13 +153,13 @@ cz bump --increment PATCH
 | Stage   | Job                | Trigger           | What it does                                      |
 |---------|--------------------|-------------------|---------------------------------------------------|
 | test    | `test`             | all pipelines     | mypy strict + pytest (75 % coverage gate)         |
-| build   | `build`            | commit / MR / tag | PyInstaller binary → `dist/git-sentinel`          |
+| build   | `build`            | commit / MR / tag | PyInstaller binary to `dist/git-sentinel`          |
 | build   | `build:nightly`    | schedule          | PyInstaller binary (rolling nightly build)        |
 | publish | `publish:release`  | versioned tag     | Uploads binary to Generic Package Registry        |
 | publish | `publish:nightly`  | schedule          | Overwrites the rolling `nightly` package entry    |
 | release | `release`          | versioned tag     | Creates a GitLab Release with binary asset linked |
 
-Scheduled pipelines (set up under CI/CD → Schedules in GitLab) produce a rolling
+Scheduled pipelines (set up under CI/CD to Schedules in GitLab) produce a rolling
 nightly build uploaded under the fixed version `nightly` - the download URL never
 changes.
 
@@ -186,7 +184,6 @@ bash scripts/build.sh        # produces dist/git-sentinel
 **Windows**
 
 ```powershell
-# No build script yet — run PyInstaller directly
-uv run pyinstaller git-sentinel.py --onefile --name git-sentinel
-.\dist\git-sentinel.exe --help
+pwsh scripts/build.ps1              # produces dist\git-sentinel.exe
+.\dist\git-sentinel.exe --help      # smoke-test the binary
 ```

@@ -175,9 +175,12 @@ class MsgLog(NamedTuple):
 
     Attributes:
         text: Line to append; a newline is added automatically.
+        tag: Optional colour tag applied to the
+            line ("error", "warning", "info").
     """
 
     text: str
+    tag: str = ""
 
 
 class MsgStatus(NamedTuple):
@@ -313,11 +316,12 @@ class AppProtocol(Protocol):
     terminal environment without touching scan.py.
     """
 
-    def log(self, text: str) -> None:
+    def log(self, text: str, tag: str = "") -> None:
         """Append a line to the output log.
 
         Args:
             text (str): Log text
+            tag (str): Optional colour tag ("error", "warning", "info").
         """
         ...
 

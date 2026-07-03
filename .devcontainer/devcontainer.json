@@ -43,7 +43,10 @@
       ],
       "settings": {
         "python.testing.pytestArgs": [
-          "tests"
+          "tests",
+          "--ignore=tests/platform/windows",
+          "--cov=src",
+          "--cov-config=.coveragerc.linux"
         ],
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,

@@ -118,15 +118,18 @@ test:
   stage: test
   image: python:3.14
   before_script:
+    - apt-get update -qq && apt-get install -y -qq xvfb tk
     - pip install uv --quiet
   script:
     - uv sync --frozen --group dev
-    - uv run mypy --strict src/ git-sentinel
-    - uv run pytest -q -m "not windows_only" --cov=src --cov-report=term-missing
+    - uv run scripts/test.py
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
 # Uses Windows runner.
-# Skips linux_only tests; runs windows_only tests that are skipped above.
+# Windows GUI tests are skipped entirely (not just deselected from coverage):
+# Tkinter under uv's venv on Windows intermittently fails to find tk, causing
+# flaky collection even on the same commit. --ignore=tests/unit/ui/gui keeps
+# collection from ever importing tkinter on this runner.
 test:windows:
   stage: test
   tags:
@@ -135,8 +138,7 @@ test:windows:
     - pip install uv --quiet
   script:
     - uv sync --frozen --group dev
-    - uv run mypy --strict src/ git-sentinel
-    - uv run pytest -q -m "not linux_only" --cov=src --cov-report=term-missing
+    - uv run scripts/test.py
   coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
 
 # ───────────────────────────────────────────────────| Shared build template |──

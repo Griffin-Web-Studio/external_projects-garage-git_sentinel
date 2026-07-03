@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-import threading
 
 from src.config import load_config
 from src.installer import install, is_installed, uninstall
-from src.schedule import should_run_today
-from .gui.app import GitSentinelApp
-from .scan import scan
+from src.services.schedule import should_run_today
+from .ui.gui.app import GitSentinelApp
 
 from . import APP_NAME
 
@@ -17,11 +15,17 @@ from . import APP_NAME
 
 def _pause_if_windows() -> None:
     if sys.platform == "win32":
-        input("\nPress Enter to close...")
+        from src.platform.windows.console import pause
+
+    else:
+        from src.platform.linux.console import pause
+
+    pause()
 
 
 def main() -> None:
     """Application entry point."""
+
     parser = argparse.ArgumentParser(
         prog=APP_NAME,
         description=(
@@ -75,8 +79,6 @@ def main() -> None:
         sys.exit(0)
 
     app = GitSentinelApp(cfg)
-    worker = threading.Thread(target=scan, args=(app, cfg), daemon=True)
-    worker.start()
     app.mainloop()
 
 

@@ -1,9 +1,0 @@
-[run]
-omit =
-    src/__main__.py
-    src/gui/*
-    src/migrations/*
-
-[report]
-show_missing = true
-skip_covered = false

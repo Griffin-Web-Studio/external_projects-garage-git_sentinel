@@ -1,0 +1,9 @@
+[run]
+omit =
+    src/__main__.py
+    src/config/migrations/*
+    src/platform/windows/*
+
+[report]
+show_missing = true
+skip_covered = false

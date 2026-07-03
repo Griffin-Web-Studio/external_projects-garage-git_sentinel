@@ -1,0 +1,10 @@
+[run]
+omit =
+    src/__main__.py
+    src/config/migrations/*
+    src/platform/linux/*
+    src/ui/gui/*
+
+[report]
+show_missing = true
+skip_covered = false
