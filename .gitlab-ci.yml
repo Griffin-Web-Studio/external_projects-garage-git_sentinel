@@ -24,11 +24,14 @@
 #
 #   Scheduled pipeline (main):
 #     -> check:nightly  compares $CI_COMMIT_SHA against the SHA recorded by
-#                        the last successful nightly publish. If unchanged,
-#                        every job below is skipped - a schedule firing on an
-#                        unchanged main produces nothing.
-#     -> test           (Linux + Windows) - always runs, regardless of
-#                        check:nightly, as a nightly health check on main
+#                        the last successful nightly publish. If unchanged, it
+#                        fails on purpose - a schedule firing on an unchanged
+#                        main should produce nothing. The red pipeline on
+#                        these nights is that "nothing to do" signal, not a
+#                        real break.
+#     -> test           (Linux + Windows) - needs: check:nightly (optional -
+#                        it doesn't exist on non-schedule pipelines), so it's
+#                        skipped along with everything else when unchanged
 #     -> build          (Linux + Windows) - APP_VERSION is suffixed with
 #                        "-nightly.<short SHA>" before PyInstaller runs, so
 #                        the binary reports e.g. "git-sentinel v0.2.0-nightly.a1b2c3d"
@@ -79,8 +82,8 @@
 #   .../packages/generic/git-sentinel/nightly/nightly-sha.txt (the commit SHA
 #   recorded by the last successful nightly publish) and compares it to
 #   $CI_COMMIT_SHA. A match means main hasn't moved since the last nightly, so
-#   build/publish are skipped via the $NIGHTLY_SKIP dotenv variable. No file
-#   yet (first-ever run) is treated as "always build".
+#   the job fails on purpose and every `needs: check:nightly` job is skipped.
+#   No file yet (first-ever run) is treated as "always build".
 
 # ──────────────────────────────────────────────────────────| Workflow Setup |──
 #
@@ -132,9 +135,13 @@ variables:
 #
 # Runs before everything else on a scheduled pipeline. Compares the current
 # commit against the SHA recorded by the last successful nightly publish; if
-# they match, main hasn't moved and there's nothing new to ship, so
-# build:nightly/build:windows:nightly/publish:nightly/publish:windows:nightly
-# all skip themselves via the $NIGHTLY_SKIP dotenv variable produced here.
+# they match, main hasn't moved and there's nothing new to ship, so this job
+# fails on purpose. test, test:windows, build:nightly, build:windows:nightly,
+# publish:nightly, and publish:windows:nightly all `needs: check:nightly`
+# (test/test:windows mark it `optional: true` since it doesn't exist outside
+# schedule pipelines), so a failure here skips every one of them - a schedule
+# firing on an unchanged main produces a red pipeline and nothing else. That
+# red is the "nothing to do" signal, not a real break.
 check:nightly:
   stage: .pre
   image: curlimages/curl:latest
@@ -149,15 +156,10 @@ check:nightly:
            || true
       LAST_SHA="$(cat nightly-sha.txt 2>/dev/null || echo "")"
       if [ "$LAST_SHA" = "$CI_COMMIT_SHA" ]; then
-        echo "No new commits since last nightly build ($LAST_SHA) - skipping."
-        echo "NIGHTLY_SKIP=true" >> nightly.env
-      else
-        echo "New commits since last nightly build - proceeding."
-        echo "NIGHTLY_SKIP=false" >> nightly.env
+        echo "No new commits since last nightly build ($LAST_SHA) - nothing to do."
+        exit 1
       fi
-  artifacts:
-    reports:
-      dotenv: nightly.env
+      echo "New commits since last nightly build ($CI_COMMIT_SHA) - proceeding."
 
 # ────────────────────────────────────────────────────────────────────| Test |──
 #
@@ -165,6 +167,9 @@ check:nightly:
 test:
   stage: test
   image: python:3.14
+  needs:
+    - job: check:nightly
+      optional: true    # doesn't exist outside scheduled pipelines
   before_script:
     - apt-get update -qq && apt-get install -y -qq xvfb tk
     - pip install uv --quiet
@@ -182,6 +187,9 @@ test:windows:
   stage: test
   tags:
     - windows
+  needs:
+    - job: check:nightly
+      optional: true    # doesn't exist outside scheduled pipelines
   before_script:
     - pip install uv --quiet
   script:
@@ -262,8 +270,6 @@ build:nightly:
   artifacts:
     expire_in: 3 days
   rules:
-    - if: $NIGHTLY_SKIP == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
 # Nightly Builds; Windows build. See build:nightly above for the version
@@ -277,8 +283,6 @@ build:windows:nightly:
   artifacts:
     expire_in: 3 days
   rules:
-    - if: $NIGHTLY_SKIP == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: always
 
@@ -323,8 +327,6 @@ publish:nightly:
   variables:
     PACKAGE_VERSION: nightly
   rules:
-    - if: $NIGHTLY_SKIP == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
     - !reference [.publish, script]
@@ -342,8 +344,6 @@ publish:windows:nightly:
     PACKAGE_VERSION: nightly
     BINARY: git-sentinel.exe
   rules:
-    - if: $NIGHTLY_SKIP == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
 # ─────────────────────────────────────────────────────────────────| Release |──
