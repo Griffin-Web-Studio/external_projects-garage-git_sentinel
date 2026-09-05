@@ -1,0 +1,152 @@
+# ───────────────────| Git Sentinel - Nightly child pipeline |──────────────────
+#
+# Triggered exclusively by trigger:nightly in the top-level .gitlab-ci.yml,
+# which only runs on scheduled pipelines targeting main. $NIGHTLY_HAS_CHANGES
+# arrives here as a forwarded trigger variable, set by check:nightly's dotenv
+# artifact in the parent pipeline: "true" if main has moved since the last
+# successful nightly publish, "false" otherwise.
+#
+# Every real job below is rules-gated on $NIGHTLY_HAS_CHANGES == "true", so on
+# an unchanged main this whole test/build/publish chain is skipped outright.
+# nightly:noop runs in the opposite case and is unconditional otherwise, so this
+# pipeline is never empty - an empty child pipeline fails the parent's trigger
+# job outright, which would just relocate the "red pipeline" problem this file
+# exists to fix.
+
+default:
+  interruptible: true
+  tags:
+    - linux
+
+stages:
+  - test
+  - build
+  - publish
+
+variables:
+  BINARY: git-sentinel
+  PACKAGE: git-sentinel
+
+nightly:noop:
+  stage: test
+  image: alpine:latest
+  rules:
+    - if: $NIGHTLY_HAS_CHANGES != "true"
+  script:
+    - echo "No new commits since the last nightly build - nothing to do."
+
+# ────────────────────────────────────────────────────────────────────| Test |──
+
+test:
+  stage: test
+  image: python:3.14
+  rules:
+    - if: $NIGHTLY_HAS_CHANGES == "true"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq xvfb tk
+    - pip install uv --quiet
+  script:
+    - uv sync --frozen --group dev
+    - uv run scripts/test.py
+  coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+
+test:windows:
+  stage: test
+  tags:
+    - windows
+  rules:
+    - if: $NIGHTLY_HAS_CHANGES == "true"
+  before_script:
+    - pip install uv --quiet
+  script:
+    - uv sync --frozen --group dev
+    - uv run scripts/test.py
+  coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+
+# ───────────────────────────────────────────────────| Shared build template |──
+
+.build:
+  stage: build
+  image: python:3.14
+  rules:
+    - if: $NIGHTLY_HAS_CHANGES == "true"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq tk
+    - pip install uv --quiet
+  script:
+    - bash scripts/build.sh
+  artifacts:
+    paths:
+      - dist/git-sentinel
+      - dist/git-sentinel.exe
+    expire_in: 3 days
+
+# Suffixes APP_VERSION with "-nightly.<short SHA>" before PyInstaller runs so
+# the compiled binary reports e.g. "git-sentinel v0.2.0-nightly.a1b2c3d" - this
+# only mutates the CI job's worktree, never committed anywhere.
+build:nightly:
+  extends: .build
+  before_script:
+    - !reference [.build, before_script]
+    - python3 scripts/patch_nightly_version.py "$CI_COMMIT_SHORT_SHA"
+  needs: [test, test:windows]
+
+# Windows build; PyInstaller auto-appends .exe on Windows. See build:nightly
+# above for the version suffixing rationale.
+build:windows:nightly:
+  stage: build
+  tags:
+    - windows
+  rules:
+    - if: $NIGHTLY_HAS_CHANGES == "true"
+  needs: [test, test:windows]
+  before_script:
+    - pip install uv --quiet
+    - python scripts/patch_nightly_version.py "$CI_COMMIT_SHORT_SHA"
+  script:
+    - uv sync --frozen --group dev
+    - pwsh scripts/build.ps1
+  artifacts:
+    paths:
+      - dist/git-sentinel.exe
+    expire_in: 3 days
+
+# ─────────────────────────────────────────────────| Shared publish template |──
+
+.publish:
+  stage: publish
+  image: curlimages/curl:latest
+  interruptible: false # never cancel a mid-flight upload
+  rules:
+    - if: $NIGHTLY_HAS_CHANGES == "true"
+  script:
+    - |
+      curl --fail --silent --show-error \
+           --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "dist/$BINARY" \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/$PACKAGE_VERSION/$BINARY"
+
+# Overwrites the single "nightly" entry on every scheduled run that has
+# changes. Also records $CI_COMMIT_SHA as nightly-sha.txt so the next
+# scheduled run's check:nightly (in the parent pipeline) can detect whether
+# main has moved since this build.
+publish:nightly:
+  extends: .publish
+  needs: [build:nightly]
+  variables:
+    PACKAGE_VERSION: nightly
+  script:
+    - !reference [.publish, script]
+    - |
+      echo -n "$CI_COMMIT_SHA" > nightly-sha.txt
+      curl --fail --silent --show-error \
+           --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file nightly-sha.txt \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$PACKAGE/nightly/nightly-sha.txt"
+
+publish:windows:nightly:
+  extends: .publish
+  needs: [build:windows:nightly]
+  variables:
+    PACKAGE_VERSION: nightly
+    BINARY: git-sentinel.exe

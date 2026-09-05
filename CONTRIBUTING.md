@@ -150,26 +150,30 @@ cz bump --increment PATCH
 
 ## CI pipeline
 
-| Stage   | Job              | Trigger           | What it does                                      |
-|---------|------------------|-------------------|----------------------------------------------------|
-| `.pre`  | `check:nightly`  | schedule          | Skips the rest of the nightly jobs if main hasn't moved since the last nightly build |
-| test    | `test`           | all pipelines     | mypy strict + pytest (75 % coverage gate)         |
-| build   | `build`          | commit / MR / tag | PyInstaller binary to `dist/git-sentinel`          |
-| build   | `build:nightly`  | schedule          | PyInstaller binary (rolling nightly build)        |
-| publish | `publish:release`| versioned tag     | Uploads binary to Generic Package Registry        |
-| publish | `publish:nightly`| schedule          | Overwrites the rolling `nightly` package entry    |
-| release | `release`        | versioned tag     | Creates a GitLab Release with binary asset linked |
+| Stage   | Job                | Trigger           | What it does                                      |
+|---------|--------------------|-------------------|----------------------------------------------------|
+| `.pre`  | `check:nightly`    | schedule          | Reports whether main has moved since the last nightly build |
+| test    | `trigger:nightly`  | schedule          | Triggers the nightly child pipeline (`.gitlab/ci/nightly.yml`) |
+| test    | `test`             | commit / MR / tag | mypy strict + pytest (75 % coverage gate)         |
+| build   | `build`            | commit / MR / tag | PyInstaller binary to `dist/git-sentinel`          |
+| publish | `publish:release`  | versioned tag     | Uploads binary to Generic Package Registry        |
+| release | `release`          | versioned tag     | Creates a GitLab Release with binary asset linked |
 
 Scheduled pipelines (set up under CI/CD to Schedules in GitLab) produce a rolling
 nightly build uploaded under the fixed version `nightly` - the download URL never
 changes.
 
 `check:nightly` compares the current commit against the SHA recorded by the
-last successful nightly publish (`nightly-sha.txt` in the same package). If
-they match, `build:nightly`/`build:windows:nightly`/`publish:nightly`/
-`publish:windows:nightly` all skip themselves, so a schedule firing on an
-unchanged `main` doesn't produce a duplicate build. `test`/`test:windows`
-still run regardless, as a nightly health check on `main`.
+last successful nightly publish (`nightly-sha.txt` in the same package), and
+records the result as `$NIGHTLY_HAS_CHANGES` in a dotenv artifact - it always
+succeeds. `trigger:nightly` forwards that variable into a child pipeline
+(`.gitlab/ci/nightly.yml`) whose `test`/`test:windows`/`build:nightly`/
+`build:windows:nightly`/`publish:nightly`/`publish:windows:nightly` jobs are
+all rules-gated on `$NIGHTLY_HAS_CHANGES == "true"`. So a schedule firing on
+an unchanged `main` skips that entire chain - not just the build/publish
+steps - and only a trivial always-green no-op job runs in its place. Nothing
+here ever fails on purpose; a red nightly pipeline now means an actual test,
+build, or publish failure.
 
 Nightly binaries report a distinct version in the app window title and
 generated reports - `git-sentinel v0.2.0-nightly.<short SHA>` - so a build can
