@@ -1,17 +1,11 @@
 # ───────────────────| Git Sentinel - Nightly child pipeline |──────────────────
 #
-# Triggered exclusively by trigger:nightly in the top-level .gitlab-ci.yml,
-# which only runs on scheduled pipelines targeting main. $NIGHTLY_HAS_CHANGES
-# arrives here as a forwarded trigger variable, set by check:nightly's dotenv
-# artifact in the parent pipeline: "true" if main has moved since the last
-# successful nightly publish, "false" otherwise.
-#
-# Every real job below is rules-gated on $NIGHTLY_HAS_CHANGES == "true", so on
-# an unchanged main this whole test/build/publish chain is skipped outright.
-# nightly:noop runs in the opposite case and is unconditional otherwise, so this
-# pipeline is never empty - an empty child pipeline fails the parent's trigger
-# job outright, which would just relocate the "red pipeline" problem this file
-# exists to fix.
+# Only ever triggered via trigger:nightly in the top-level .gitlab-ci.yml, and
+# only when check:nightly determined main has moved since the last successful
+# nightly publish - in that case check:nightly copies this file verbatim into
+# generated-nightly.yml, which is what actually runs. When main hasn't moved,
+# check:nightly generates a single no-op job instead and this file is never
+# used, so nothing here needs its own "is there anything to do?" gate.
 
 default:
   interruptible: true
@@ -27,21 +21,11 @@ variables:
   BINARY: git-sentinel
   PACKAGE: git-sentinel
 
-nightly:noop:
-  stage: test
-  image: alpine:latest
-  rules:
-    - if: $NIGHTLY_HAS_CHANGES != "true"
-  script:
-    - echo "No new commits since the last nightly build - nothing to do."
-
 # ────────────────────────────────────────────────────────────────────| Test |──
 
 test:
   stage: test
   image: python:3.14
-  rules:
-    - if: $NIGHTLY_HAS_CHANGES == "true"
   before_script:
     - apt-get update -qq && apt-get install -y -qq xvfb tk
     - pip install uv --quiet
@@ -54,8 +38,6 @@ test:windows:
   stage: test
   tags:
     - windows
-  rules:
-    - if: $NIGHTLY_HAS_CHANGES == "true"
   before_script:
     - pip install uv --quiet
   script:
@@ -68,8 +50,6 @@ test:windows:
 .build:
   stage: build
   image: python:3.14
-  rules:
-    - if: $NIGHTLY_HAS_CHANGES == "true"
   before_script:
     - apt-get update -qq && apt-get install -y -qq tk
     - pip install uv --quiet
@@ -97,8 +77,6 @@ build:windows:nightly:
   stage: build
   tags:
     - windows
-  rules:
-    - if: $NIGHTLY_HAS_CHANGES == "true"
   needs: [test, test:windows]
   before_script:
     - pip install uv --quiet
@@ -117,8 +95,6 @@ build:windows:nightly:
   stage: publish
   image: curlimages/curl:latest
   interruptible: false # never cancel a mid-flight upload
-  rules:
-    - if: $NIGHTLY_HAS_CHANGES == "true"
   script:
     - |
       curl --fail --silent --show-error \

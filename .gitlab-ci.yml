@@ -24,19 +24,18 @@
 #
 #   Scheduled pipeline (main):
 #     -> check:nightly    compares $CI_COMMIT_SHA against the SHA recorded by
-#                          the last successful nightly publish and records the
-#                          result as $NIGHTLY_HAS_CHANGES ("true"/"false") in a
-#                          dotenv artifact. Always succeeds - it never fails on
-#                          purpose, it just reports whether there's anything to
-#                          do.
-#     -> trigger:nightly  forwards $NIGHTLY_HAS_CHANGES (via the dotenv
-#                          artifact) into a child pipeline defined in
-#                          .gitlab/ci/nightly.yml. That child pipeline's own
-#                          jobs are rules-gated on $NIGHTLY_HAS_CHANGES, so on
-#                          an unchanged main the entire test/build/publish
-#                          suite is skipped - not failed - and only a trivial
-#                          always-green no-op job runs. See that file for the
-#                          nightly test/build/publish chain.
+#                          the last successful nightly publish and generates
+#                          generated-nightly.yml: a copy of
+#                          .gitlab/ci/nightly.yml (the real test/build/publish
+#                          chain) if main has moved, or a single no-op job if
+#                          not. Always succeeds - it never fails on purpose,
+#                          it just decides what the next job runs.
+#     -> trigger:nightly  runs generated-nightly.yml as a child pipeline
+#                          (strategy: depend, so this job's own status
+#                          mirrors it). On an unchanged main that's just the
+#                          no-op job, so the whole test/build/publish suite
+#                          is skipped - not failed. See .gitlab/ci/nightly.yml
+#                          for the real nightly chain.
 #
 #
 # COMMIT TYPE FILTER
@@ -82,9 +81,9 @@
 #   .../packages/generic/git-sentinel/nightly/nightly-sha.txt (the commit SHA
 #   recorded by the last successful nightly publish) and compares it to
 #   $CI_COMMIT_SHA. A match means main hasn't moved since the last nightly, so
-#   $NIGHTLY_HAS_CHANGES is set to "false" and the nightly child pipeline's
-#   test/build/publish jobs are all rules-gated out. No file yet (first-ever
-#   run) is treated as "always build".
+#   the generated child pipeline is a single no-op job instead of the real
+#   test/build/publish chain. No file yet (first-ever run) is treated as
+#   "always build".
 
 # ──────────────────────────────────────────────────────────| Workflow Setup |──
 #
@@ -136,9 +135,17 @@ variables:
 #
 # Runs before everything else on a scheduled pipeline. Compares the current
 # commit against the SHA recorded by the last successful nightly publish and
-# records the verdict as $NIGHTLY_HAS_CHANGES in a dotenv artifact - it always
-# exits 0. trigger:nightly (needs: check:nightly) forwards that variable into
-# the nightly child pipeline, where it gates every test/build/publish job.
+# generates the actual child pipeline config that trigger:nightly will run -
+# it always exits 0. If main hasn't moved, generated-nightly.yml is a single
+# no-op job; otherwise it's a copy of .gitlab/ci/nightly.yml (the real
+# test/build/publish chain).
+#
+# This bakes the "anything to do?" decision directly into the generated YAML
+# content rather than passing a variable for the child pipeline's own rules
+# to read - GitLab does not reliably make a parent job's variables available
+# when it evaluates a *child* pipeline's rules (gitlab-org/gitlab#408160), so
+# a $NIGHTLY_HAS_CHANGES-style variable can silently read as unset there and
+# make the gate look like it's stuck on "nothing changed".
 check:nightly:
   stage: .pre
   image: curlimages/curl:latest
@@ -154,20 +161,26 @@ check:nightly:
       LAST_SHA="$(cat nightly-sha.txt 2>/dev/null || echo "")"
       if [ "$LAST_SHA" = "$CI_COMMIT_SHA" ]; then
         echo "No new commits since last nightly build ($LAST_SHA) - nothing to do."
-        echo "NIGHTLY_HAS_CHANGES=false" > nightly.env
+        printf '%s\n' \
+          'nightly:noop:' \
+          '  tags:' \
+          '    - linux' \
+          '  image: alpine:latest' \
+          '  script:' \
+          '    - echo "No new commits since the last nightly build - nothing to do."' \
+          > generated-nightly.yml
       else
         echo "New commits since last nightly build ($CI_COMMIT_SHA) - proceeding."
-        echo "NIGHTLY_HAS_CHANGES=true" > nightly.env
+        cp .gitlab/ci/nightly.yml generated-nightly.yml
       fi
   artifacts:
-    reports:
-      dotenv: nightly.env
+    paths:
+      - generated-nightly.yml
 
-# Forwards $NIGHTLY_HAS_CHANGES (from check:nightly's dotenv artifact) into
-# the nightly child pipeline as a trigger variable. strategy: depend makes
-# this job's own status mirror the child pipeline's status, so a real nightly
-# failure (test/build/publish) still shows up as a failed pipeline here - only
-# the "nothing to do" case stays green.
+# Runs the config check:nightly generated. strategy: depend makes this job's
+# own status mirror the child pipeline's status, so a real nightly failure
+# (test/build/publish) still shows up as a failed pipeline here - only the
+# "nothing to do" case stays green.
 trigger:nightly:
   stage: test
   needs: [check:nightly]
@@ -175,7 +188,8 @@ trigger:nightly:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   trigger:
     include:
-      - local: .gitlab/ci/nightly.yml
+      - artifact: generated-nightly.yml
+        job: check:nightly
     strategy: depend
 
 # ────────────────────────────────────────────────────────────────────| Test |──

@@ -164,16 +164,26 @@ nightly build uploaded under the fixed version `nightly` - the download URL neve
 changes.
 
 `check:nightly` compares the current commit against the SHA recorded by the
-last successful nightly publish (`nightly-sha.txt` in the same package), and
-records the result as `$NIGHTLY_HAS_CHANGES` in a dotenv artifact - it always
-succeeds. `trigger:nightly` forwards that variable into a child pipeline
-(`.gitlab/ci/nightly.yml`) whose `test`/`test:windows`/`build:nightly`/
-`build:windows:nightly`/`publish:nightly`/`publish:windows:nightly` jobs are
-all rules-gated on `$NIGHTLY_HAS_CHANGES == "true"`. So a schedule firing on
-an unchanged `main` skips that entire chain - not just the build/publish
-steps - and only a trivial always-green no-op job runs in its place. Nothing
-here ever fails on purpose; a red nightly pipeline now means an actual test,
-build, or publish failure.
+last successful nightly publish (`nightly-sha.txt` in the same package) - it
+always succeeds. What it does next depends on the result: if main has moved,
+it copies `.gitlab/ci/nightly.yml` (the real `test`/`test:windows`/
+`build:nightly`/`build:windows:nightly`/`publish:nightly`/
+`publish:windows:nightly` chain) to `generated-nightly.yml`; if not, it writes
+a single no-op job there instead. `trigger:nightly` then runs whichever one
+was generated as a child pipeline. So a schedule firing on an unchanged
+`main` skips that entire chain - not just the build/publish steps - and only
+a trivial always-green no-op job runs in its place. Nothing here ever fails
+on purpose; a red nightly pipeline now means an actual test, build, or
+publish failure.
+
+(An earlier version of this gate tried to pass a `$NIGHTLY_HAS_CHANGES`
+variable into the child pipeline for its own `rules:` to read, via a dotenv
+artifact. That doesn't work reliably - GitLab doesn't guarantee a parent
+job's variables are available when it evaluates a *child* pipeline's rules
+(gitlab-org/gitlab#408160) - so the gate always looked like "nothing
+changed" regardless of the real answer. Generating the child pipeline's
+actual content in `check:nightly`, instead of a variable for it to branch
+on, sidesteps that entirely.)
 
 Nightly binaries report a distinct version in the app window title and
 generated reports - `git-sentinel v0.2.0-nightly.<short SHA>` - so a build can
