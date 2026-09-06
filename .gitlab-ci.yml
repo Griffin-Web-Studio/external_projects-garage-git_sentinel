@@ -181,6 +181,16 @@ check:nightly:
 # own status mirror the child pipeline's status, so a real nightly failure
 # (test/build/publish) still shows up as a failed pipeline here - only the
 # "nothing to do" case stays green.
+#
+# forward.yaml_variables: false stops this pipeline's own YAML-defined
+# variables (e.g. the global BINARY/PACKAGE above) from being forwarded into
+# the child as trigger variables. Forwarded variables outrank a job's own
+# `variables:` in the child (gitlab-org/gitlab#404772), so without this,
+# BINARY: git-sentinel here silently overrides
+# publish:windows:nightly's own BINARY: git-sentinel.exe override in
+# .gitlab/ci/nightly.yml, and the Windows nightly publish uploads/looks for
+# the wrong filename. The child pipeline defines everything it needs itself,
+# so nothing from up here should leak in.
 trigger:nightly:
   stage: test
   needs: [check:nightly]
@@ -191,6 +201,8 @@ trigger:nightly:
       - artifact: generated-nightly.yml
         job: check:nightly
     strategy: depend
+    forward:
+      yaml_variables: false
 
 # ────────────────────────────────────────────────────────────────────| Test |──
 #
